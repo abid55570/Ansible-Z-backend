@@ -1,0 +1,173 @@
+{% raw %}---
+# ECS Fargate service behind an Application Load Balancer.
+# Values come from group_vars/all.yml (auto-loaded).
+- name: Provision ECS Fargate service
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - amazon.aws
+    - community.aws
+  tasks:
+    - name: Create VPC
+      amazon.aws.ec2_vpc_net:
+        name: "{{ project_name }}-{{ environment_name }}-vpc"
+        cidr_block: "{{ vpc_cidr }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: vpc
+
+    - name: Internet gateway
+      amazon.aws.ec2_vpc_igw:
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: igw
+
+    - name: Public subnet A
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ subnet_a_cidr }}"
+        az: "{{ az_a }}"
+        region: "{{ aws_region }}"
+        map_public: true
+        tags: "{{ common_tags | combine({'Name': project_name + '-public-a'}) }}"
+        state: present
+      register: pub_a
+
+    - name: Public subnet B
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ subnet_b_cidr }}"
+        az: "{{ az_b }}"
+        region: "{{ aws_region }}"
+        map_public: true
+        tags: "{{ common_tags | combine({'Name': project_name + '-public-b'}) }}"
+        state: present
+      register: pub_b
+
+    - name: Public route table
+      amazon.aws.ec2_vpc_route_table:
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        subnets:
+          - "{{ pub_a.subnet.id }}"
+          - "{{ pub_b.subnet.id }}"
+        routes:
+          - dest: 0.0.0.0/0
+            gateway_id: "{{ igw.gateway_id }}"
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: ALB security group
+      amazon.aws.ec2_security_group:
+        name: "{{ project_name }}-alb-sg"
+        description: "Public ALB"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp
+            ports: [80, 443]
+            cidr_ip: 0.0.0.0/0
+        tags: "{{ common_tags }}"
+        state: present
+      register: alb_sg
+
+    - name: Service security group (traffic from the ALB only)
+      amazon.aws.ec2_security_group:
+        name: "{{ project_name }}-svc-sg"
+        description: "Container port from the ALB"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp
+            ports: ["{{ container_port }}"]
+            group_id: "{{ alb_sg.group_id }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: svc_sg
+
+    - name: ECS task execution role
+      amazon.aws.iam_role:
+        name: "{{ project_name }}-ecs-exec"
+        assume_role_policy_document: '{ "Version": "2012-10-17", "Statement": [{ "Effect": "Allow", "Principal": {"Service": "ecs-tasks.amazonaws.com"}, "Action": "sts:AssumeRole" }] }'
+        managed_policies:
+          - "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+        state: present
+      register: exec_role
+
+    - name: Target group (Fargate uses ip targets)
+      community.aws.elb_target_group:
+        name: "{{ project_name }}-tg"
+        region: "{{ aws_region }}"
+        protocol: HTTP
+        port: "{{ container_port }}"
+        vpc_id: "{{ vpc.vpc.id }}"
+        target_type: ip
+        health_check_path: /
+        state: present
+      register: tg
+
+    - name: Application load balancer
+      amazon.aws.elb_application_lb:
+        name: "{{ project_name }}-alb"
+        region: "{{ aws_region }}"
+        subnets:
+          - "{{ pub_a.subnet.id }}"
+          - "{{ pub_b.subnet.id }}"
+        security_groups:
+          - "{{ alb_sg.group_id }}"
+        listeners:
+          - Protocol: HTTP
+            Port: 80
+            DefaultActions:
+              - Type: forward
+                TargetGroupName: "{{ project_name }}-tg"
+        state: present
+
+    - name: ECS cluster
+      community.aws.ecs_cluster:
+        name: "{{ project_name }}-cluster"
+        region: "{{ aws_region }}"
+        state: present
+
+    - name: ECS task definition (Fargate)
+      community.aws.ecs_taskdefinition:
+        family: "{{ project_name }}-task"
+        region: "{{ aws_region }}"
+        launch_type: FARGATE
+        network_mode: awsvpc
+        cpu: "{{ task_cpu }}"
+        memory: "{{ task_memory }}"
+        execution_role_arn: "{{ exec_role.arn }}"
+        containers:
+          - name: "{{ project_name }}-app"
+            image: "{{ container_image }}"
+            essential: true
+            portMappings:
+              - containerPort: "{{ container_port }}"
+                protocol: tcp
+        state: present
+
+    - name: ECS Fargate service
+      community.aws.ecs_service:
+        name: "{{ project_name }}-svc"
+        cluster: "{{ project_name }}-cluster"
+        task_definition: "{{ project_name }}-task"
+        desired_count: "{{ desired_count }}"
+        launch_type: FARGATE
+        network_configuration:
+          subnets:
+            - "{{ pub_a.subnet.id }}"
+            - "{{ pub_b.subnet.id }}"
+          security_groups:
+            - "{{ svc_sg.group_id }}"
+          assign_public_ip: true
+        load_balancers:
+          - targetGroupArn: "{{ tg.target_group_arn }}"
+            containerName: "{{ project_name }}-app"
+            containerPort: "{{ container_port }}"
+        state: present
+{% endraw %}

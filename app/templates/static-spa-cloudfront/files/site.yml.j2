@@ -1,0 +1,43 @@
+{% raw %}---
+# Static SPA: a private S3 origin behind a CloudFront CDN (HTTPS).
+# Values come from group_vars/all.yml (auto-loaded).
+- name: Provision static SPA on CloudFront
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - amazon.aws
+    - community.aws
+  tasks:
+    - name: Create the private origin bucket
+      amazon.aws.s3_bucket:
+        name: "{{ bucket_name }}"
+        region: "{{ aws_region }}"
+        public_access:
+          block_public_acls: true
+          block_public_policy: true
+          ignore_public_acls: true
+          restrict_public_buckets: true
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: CloudFront distribution in front of the bucket
+      community.aws.cloudfront_distribution:
+        state: present
+        comment: "{{ project_name }} SPA"
+        default_root_object: "{{ index_document }}"
+        origins:
+          - id: "s3-{{ bucket_name }}"
+            domain_name: "{{ bucket_name }}.s3.{{ aws_region }}.amazonaws.com"
+            s3_origin_access_identity_enabled: true
+        default_cache_behavior:
+          target_origin_id: "s3-{{ bucket_name }}"
+          viewer_protocol_policy: redirect-to-https
+        enabled: true
+        tags: "{{ common_tags }}"
+      register: cdn
+
+    - name: Show the CloudFront domain
+      ansible.builtin.debug:
+        msg: "SPA available at https://{{ cdn.domain_name | default('(see CloudFront console)') }}"
+{% endraw %}

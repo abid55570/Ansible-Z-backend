@@ -1,0 +1,61 @@
+{% raw %}---
+# Data lake (raw + curated S3) with a Glue crawler and ETL job, query-ready for Athena.
+# Values come from group_vars/all.yml (auto-loaded).
+- name: Provision data lake + analytics
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - amazon.aws
+    - community.aws
+  tasks:
+    - name: Raw data bucket
+      amazon.aws.s3_bucket:
+        name: "{{ raw_bucket }}"
+        region: "{{ aws_region }}"
+        versioning: true
+        tags: "{{ common_tags | combine({'Zone': 'raw'}) }}"
+        state: present
+
+    - name: Curated data bucket
+      amazon.aws.s3_bucket:
+        name: "{{ curated_bucket }}"
+        region: "{{ aws_region }}"
+        versioning: true
+        tags: "{{ common_tags | combine({'Zone': 'curated'}) }}"
+        state: present
+
+    - name: Glue service role
+      amazon.aws.iam_role:
+        name: "{{ project_name }}-glue-role"
+        assume_role_policy_document: '{ "Version": "2012-10-17", "Statement": [{ "Effect": "Allow", "Principal": {"Service": "glue.amazonaws.com"}, "Action": "sts:AssumeRole" }] }'
+        managed_policies:
+          - "arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole"
+          - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+        state: present
+      register: glue_role
+
+    - name: Glue crawler over the raw bucket
+      community.aws.glue_crawler:
+        name: "{{ project_name }}-raw-crawler"
+        database_name: "{{ glue_database }}"
+        role: "{{ glue_role.arn }}"
+        targets:
+          S3Targets:
+            - Path: "s3://{{ raw_bucket }}/"
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: Glue ETL job (raw -> curated)
+      community.aws.glue_job:
+        name: "{{ project_name }}-etl"
+        role: "{{ glue_role.arn }}"
+        glue_version: "4.0"
+        command:
+          name: glueetl
+          script_location: "s3://{{ curated_bucket }}/scripts/etl.py"
+        default_arguments:
+          "--TempDir": "s3://{{ curated_bucket }}/tmp/"
+        tags: "{{ common_tags }}"
+        state: present
+{% endraw %}

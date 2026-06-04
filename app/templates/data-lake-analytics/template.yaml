@@ -1,0 +1,54 @@
+id: data-lake-analytics
+name: "Data Lake + Analytics"
+version: 0.1.0
+pci: scope-reducer
+tier: enterprise
+summary: "An S3 data lake (raw + curated) with a Glue crawler and ETL job — query-ready for Athena."
+roles: [s3_lake, glue_catalog, glue_etl]
+
+variables:
+  project_name:
+    type: string
+    required: true
+    example: "acme-data"
+    guidance:
+      what: "Short slug used to name and tag resources."
+      how_to_get: "Pick a lowercase name, e.g. 'acme-data'."
+
+  aws_region:
+    type: string
+    required: true
+    example: "ap-south-1"
+    guidance:
+      what: "AWS region for the lake."
+      how_to_get: "Mumbai = ap-south-1, Singapore = ap-southeast-1."
+
+  bucket_prefix:
+    type: string
+    required: true
+    example: "acme-datalake-12345"
+    guidance:
+      what: "Globally-unique prefix; '-raw' and '-curated' buckets are created from it."
+      how_to_get: "Must be globally unique, lowercase; add a random suffix."
+
+  glue_database:
+    type: string
+    required: false
+    default: "analytics_db"
+    guidance:
+      what: "Glue Data Catalog database the crawler populates."
+      how_to_get: "A lowercase name; Athena queries this database."
+
+diagram:
+  nodes:
+    - { id: raw, type: s3_bucket, label: "Raw bucket" }
+    - { id: curated, type: s3_bucket, label: "Curated bucket" }
+    - { id: role, type: iam_role, label: "Glue role" }
+    - { id: crawler, type: glue_crawler, label: "Glue crawler" }
+    - { id: job, type: glue_job, label: "Glue ETL job" }
+  edges:
+    - { from: role, to: crawler }
+    - { from: raw, to: crawler }
+    - { from: role, to: job }
+    - { from: raw, to: job }
+    - { from: job, to: curated }

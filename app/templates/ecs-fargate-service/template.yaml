@@ -1,0 +1,78 @@
+id: ecs-fargate-service
+name: "ECS Fargate Service"
+version: 0.1.0
+pci: capable
+tier: enterprise
+summary: "Serverless containers: an ECS Fargate service behind an Application Load Balancer — no servers to manage."
+roles: [vpc, alb, ecs_fargate]
+
+variables:
+  project_name:
+    type: string
+    required: true
+    example: "my-svc"
+    guidance:
+      what: "Short slug used to name and tag all resources."
+      how_to_get: "Pick a lowercase name, e.g. 'my-svc'."
+
+  aws_region:
+    type: string
+    required: true
+    example: "ap-south-1"
+    guidance:
+      what: "AWS region to deploy into."
+      how_to_get: "Mumbai = ap-south-1, Singapore = ap-southeast-1."
+
+  vpc_cidr:
+    type: cidr
+    required: true
+    default: "10.60.0.0/16"
+    guidance:
+      what: "Network range for the VPC."
+      how_to_get: "Any /16 that does not overlap your other networks."
+
+  container_image:
+    type: string
+    required: true
+    default: "public.ecr.aws/nginx/nginx:latest"
+    guidance:
+      what: "Container image the service runs."
+      how_to_get: "An ECR or public image ref, e.g. <acct>.dkr.ecr.<region>.amazonaws.com/app:1.0."
+
+  container_port:
+    type: number
+    required: true
+    default: 80
+    guidance:
+      what: "Port your container listens on."
+      how_to_get: "Match your app (80 for nginx, 8080 for many web apps)."
+
+  desired_count:
+    type: number
+    required: true
+    default: 2
+    guidance:
+      what: "How many tasks (containers) to run."
+      how_to_get: "Start with 2 for availability."
+
+diagram:
+  nodes:
+    - { id: vpc, type: vpc, label: "VPC" }
+    - { id: igw, type: igw, label: "Internet gateway" }
+    - { id: pub_a, type: subnet, label: "Public subnet A" }
+    - { id: pub_b, type: subnet, label: "Public subnet B" }
+    - { id: alb_sg, type: security_group, label: "ALB SG" }
+    - { id: alb, type: alb, label: "Application LB" }
+    - { id: tg, type: target_group, label: "Target group (ip)" }
+    - { id: svc, type: ecs_service, label: "ECS Fargate service" }
+  edges:
+    - { from: vpc, to: igw, port: vpc }
+    - { from: vpc, to: pub_a, port: vpc }
+    - { from: vpc, to: pub_b, port: vpc }
+    - { from: vpc, to: alb_sg, port: vpc }
+    - { from: pub_a, to: alb, port: subnets }
+    - { from: pub_b, to: alb, port: subnets }
+    - { from: alb_sg, to: alb, port: security_group }
+    - { from: vpc, to: tg, port: vpc }
+    - { from: tg, to: svc }
+    - { from: alb, to: svc }

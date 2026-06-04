@@ -1,0 +1,47 @@
+id: static-spa-cloudfront
+name: "Static SPA on CloudFront"
+version: 0.1.0
+pci: none
+tier: enterprise
+summary: "A single-page app served globally over HTTPS: a private S3 origin behind a CloudFront CDN."
+roles: [s3_origin, cloudfront]
+
+variables:
+  project_name:
+    type: string
+    required: true
+    example: "my-spa"
+    guidance:
+      what: "Short slug used to tag resources."
+      how_to_get: "Pick a lowercase name, e.g. 'my-spa'."
+
+  aws_region:
+    type: string
+    required: true
+    example: "ap-south-1"
+    guidance:
+      what: "AWS region for the S3 origin bucket."
+      how_to_get: "Mumbai = ap-south-1, Singapore = ap-southeast-1."
+
+  bucket_name:
+    type: string
+    required: true
+    example: "my-spa-assets-12345"
+    guidance:
+      what: "Globally-unique S3 bucket holding the built SPA assets."
+      how_to_get: "Must be globally unique, lowercase; add a random suffix."
+
+  index_document:
+    type: string
+    required: false
+    default: "index.html"
+    guidance:
+      what: "Default root object served by CloudFront."
+      how_to_get: "Usually index.html for an SPA."
+
+diagram:
+  nodes:
+    - { id: bucket, type: s3_bucket, label: "S3 origin (private)" }
+    - { id: cdn, type: cloudfront, label: "CloudFront (HTTPS)" }
+  edges:
+    - { from: bucket, to: cdn }

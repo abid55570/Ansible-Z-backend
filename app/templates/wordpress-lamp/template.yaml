@@ -1,0 +1,92 @@
+id: wordpress-lamp
+name: "WordPress on LAMP"
+version: 0.1.0
+pci: none
+tier: enterprise
+summary: "Classic WordPress: an EC2 web server (Apache/PHP via cloud-init) backed by a managed RDS MySQL database."
+roles: [vpc, security_groups, rds_mysql, ec2_web]
+
+variables:
+  project_name:
+    type: string
+    required: true
+    example: "my-blog"
+    guidance:
+      what: "Short slug used to name and tag all resources."
+      how_to_get: "Pick a lowercase name, e.g. 'my-blog'."
+
+  aws_region:
+    type: string
+    required: true
+    example: "ap-south-1"
+    guidance:
+      what: "AWS region to deploy into."
+      how_to_get: "Mumbai = ap-south-1, Singapore = ap-southeast-1."
+
+  vpc_cidr:
+    type: cidr
+    required: true
+    default: "10.50.0.0/16"
+    guidance:
+      what: "Network range for the VPC."
+      how_to_get: "Any /16 that does not overlap your other networks."
+
+  instance_type:
+    type: string
+    required: true
+    default: "t3.small"
+    guidance:
+      what: "EC2 size for the web server."
+      how_to_get: "t3.small is fine for a small blog."
+
+  ami_id:
+    type: string
+    required: false
+    guidance:
+      what: "Ubuntu 22.04 AMI to launch (set before running)."
+      how_to_get: "EC2 console -> AMIs -> filter 'ubuntu-jammy-22.04'."
+
+  db_username:
+    type: string
+    required: true
+    default: "wpadmin"
+    guidance:
+      what: "Master username for the MySQL database."
+      how_to_get: "Pick a name; avoid 'admin'/'root'."
+
+  db_password:
+    type: string
+    required: true
+    scope: [uat, prod]
+    example: "ChangeMe-store-in-vault"
+    guidance:
+      what: "Master password for MySQL — store it in ansible-vault, not plain text."
+      how_to_get: "Generate a strong password; keep it in a vault file."
+
+  office_ip:
+    type: cidr
+    required: true
+    scope: [uat, prod]
+    example: "203.0.113.10/32"
+    guidance:
+      what: "The only public IP allowed to SSH the web server."
+      how_to_get: "Run: curl https://checkip.amazonaws.com  then append /32"
+
+diagram:
+  nodes:
+    - { id: vpc, type: vpc, label: "VPC" }
+    - { id: igw, type: igw, label: "Internet gateway" }
+    - { id: pub_a, type: subnet, label: "Public subnet A" }
+    - { id: pub_b, type: subnet, label: "Public subnet B" }
+    - { id: web_sg, type: security_group, label: "Web SG" }
+    - { id: web, type: ec2_instance, label: "WordPress (Apache/PHP)" }
+    - { id: db, type: rds, label: "RDS MySQL" }
+  edges:
+    - { from: vpc, to: igw, port: vpc }
+    - { from: vpc, to: pub_a, port: vpc }
+    - { from: vpc, to: pub_b, port: vpc }
+    - { from: vpc, to: web_sg, port: vpc }
+    - { from: pub_a, to: web, port: subnet }
+    - { from: web_sg, to: web, port: security_group }
+    - { from: pub_a, to: db, port: subnets }
+    - { from: pub_b, to: db, port: subnets }

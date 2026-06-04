@@ -1,0 +1,24 @@
+{% raw %}---
+- name: Preflight checks
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Verify AWS credentials
+      amazon.aws.aws_caller_info:
+      register: caller
+
+    - name: Show identity
+      ansible.builtin.debug:
+        msg: "Authenticated to AWS account {{ caller.account }} as {{ caller.arn }}"
+
+    - name: Assert required variables are present
+      ansible.builtin.assert:
+        that:
+          - aws_region | length > 0
+          - vpc_cidr | length > 0
+          - ami_id != 'ami-PLACEHOLDER'
+          - db_password != 'CHANGE_ME_IN_VAULT'
+          - office_ip != 'REPLACE_WITH_YOUR_IP/32'
+        fail_msg: "Set aws_region, vpc_cidr, ami_id, db_password and office_ip in group_vars/all.yml"
+{% endraw %}

@@ -1,0 +1,143 @@
+{% raw %}---
+# WordPress on LAMP: an EC2 web server (Apache/PHP/WordPress via cloud-init)
+# backed by a managed RDS MySQL database. Values come from group_vars/all.yml.
+- name: Provision WordPress LAMP stack
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - amazon.aws
+    - community.aws
+  tasks:
+    - name: Create VPC
+      amazon.aws.ec2_vpc_net:
+        name: "{{ project_name }}-{{ environment_name }}-vpc"
+        cidr_block: "{{ vpc_cidr }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: vpc
+
+    - name: Internet gateway
+      amazon.aws.ec2_vpc_igw:
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: igw
+
+    - name: Public subnet A
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ subnet_a_cidr }}"
+        az: "{{ az_a }}"
+        region: "{{ aws_region }}"
+        map_public: true
+        tags: "{{ common_tags | combine({'Name': project_name + '-public-a', 'Role': 'public'}) }}"
+        state: present
+      register: pub_a
+
+    - name: Public subnet B
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ subnet_b_cidr }}"
+        az: "{{ az_b }}"
+        region: "{{ aws_region }}"
+        map_public: true
+        tags: "{{ common_tags | combine({'Name': project_name + '-public-b', 'Role': 'public'}) }}"
+        state: present
+      register: pub_b
+
+    - name: Public route table
+      amazon.aws.ec2_vpc_route_table:
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        subnets:
+          - "{{ pub_a.subnet.id }}"
+          - "{{ pub_b.subnet.id }}"
+        routes:
+          - dest: 0.0.0.0/0
+            gateway_id: "{{ igw.gateway_id }}"
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: Web security group
+      amazon.aws.ec2_security_group:
+        name: "{{ project_name }}-web-sg"
+        description: "WordPress web: SSH from office, HTTP/HTTPS public"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp
+            ports: [22]
+            cidr_ip: "{{ office_ip }}"
+          - proto: tcp
+            ports: [80, 443]
+            cidr_ip: 0.0.0.0/0
+        tags: "{{ common_tags }}"
+        state: present
+      register: web_sg
+
+    - name: Database security group (MySQL from web tier only)
+      amazon.aws.ec2_security_group:
+        name: "{{ project_name }}-db-sg"
+        description: "MySQL 3306 from the web security group"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp
+            ports: [3306]
+            group_id: "{{ web_sg.group_id }}"
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: DB subnet group
+      amazon.aws.rds_subnet_group:
+        name: "{{ project_name }}-db-subnets"
+        region: "{{ aws_region }}"
+        description: "DB subnets for {{ project_name }}"
+        subnets:
+          - "{{ pub_a.subnet.id }}"
+          - "{{ pub_b.subnet.id }}"
+        state: present
+
+    - name: RDS MySQL database
+      amazon.aws.rds_instance:
+        id: "{{ project_name }}-mysql"
+        region: "{{ aws_region }}"
+        engine: mysql
+        db_instance_class: "{{ db_instance_class }}"
+        allocated_storage: 20
+        master_username: "{{ db_username }}"
+        master_user_password: "{{ db_password }}"
+        db_subnet_group_name: "{{ project_name }}-db-subnets"
+        publicly_accessible: false
+        state: present
+
+    - name: WordPress web server (Apache/PHP via cloud-init)
+      amazon.aws.ec2_instance:
+        name: "{{ project_name }}-web"
+        region: "{{ aws_region }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ ami_id }}"
+        key_name: "{{ key_name | default(omit, true) }}"
+        vpc_subnet_id: "{{ pub_a.subnet.id }}"
+        security_groups:
+          - "{{ web_sg.group_id }}"
+        network:
+          assign_public_ip: true
+        tags: "{{ common_tags | combine({'Role': 'app'}) }}"
+        user_data: |
+          #cloud-config
+          package_update: true
+          packages:
+            - apache2
+            - php
+            - php-mysql
+            - libapache2-mod-php
+          runcmd:
+            - wget -q https://wordpress.org/latest.tar.gz -O /tmp/wp.tar.gz
+            - tar -xzf /tmp/wp.tar.gz -C /var/www/
+            - systemctl enable --now apache2
+        state: started
+{% endraw %}
