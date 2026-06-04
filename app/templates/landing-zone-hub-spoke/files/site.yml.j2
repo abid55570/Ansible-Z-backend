@@ -1,0 +1,51 @@
+{% raw %}---
+- name: Provision hub-and-spoke landing zone
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - amazon.aws
+    - community.aws
+  tasks:
+    - name: Transit gateway (the hub)
+      community.aws.ec2_transit_gateway:
+        description: "{{ org_name }} hub"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: tgw
+
+    - name: Hub VPC (shared services)
+      amazon.aws.ec2_vpc_net:
+        name: "{{ org_name }}-hub"
+        cidr_block: "{{ hub_cidr }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: hub
+
+    - name: Hub subnet
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ hub.vpc.id }}"
+        cidr: "{{ hub_cidr.split('.')[0] }}.{{ hub_cidr.split('.')[1] }}.1.0/24"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: Spoke VPCs
+      amazon.aws.ec2_vpc_net:
+        name: "{{ org_name }}-spoke-{{ item }}"
+        cidr_block: "10.{{ 110 + item }}.0.0/16"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      loop: "{{ range(1, (spoke_count | int) + 1) | list }}"
+
+    - name: Central logging bucket
+      amazon.aws.s3_bucket:
+        name: "{{ org_name }}-central-logs"
+        region: "{{ aws_region }}"
+        versioning: true
+        tags: "{{ common_tags }}"
+        state: present
+{% endraw %}

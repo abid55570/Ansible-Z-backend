@@ -1,0 +1,64 @@
+{% raw %}---
+- name: Provision zero-trust access (SSM, no bastion)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - amazon.aws
+  tasks:
+    - name: VPC
+      amazon.aws.ec2_vpc_net:
+        name: "{{ project_name }}-vpc"
+        cidr_block: "{{ vpc_cidr }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: vpc
+
+    - name: Private subnet
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ private_subnet_cidr }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: subnet
+
+    - name: Endpoint security group (HTTPS from within the VPC)
+      amazon.aws.ec2_security_group:
+        name: "{{ project_name }}-endpoints-sg"
+        description: "HTTPS to SSM VPC endpoints"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp
+            ports: [443]
+            cidr_ip: "{{ vpc_cidr }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: ep_sg
+
+    - name: SSM interface VPC endpoints (no bastion needed)
+      amazon.aws.ec2_vpc_endpoint:
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        service: "com.amazonaws.{{ aws_region }}.{{ item }}"
+        vpc_endpoint_type: Interface
+        subnets:
+          - "{{ subnet.subnet.id }}"
+        security_groups:
+          - "{{ ep_sg.group_id }}"
+        state: present
+      loop:
+        - ssm
+        - ec2messages
+        - ssmmessages
+
+    - name: Instance role for SSM (least privilege)
+      amazon.aws.iam_role:
+        name: "{{ project_name }}-ssm-role"
+        assume_role_policy_document: '{ "Version": "2012-10-17", "Statement": [{ "Effect": "Allow", "Principal": {"Service": "ec2.amazonaws.com"}, "Action": "sts:AssumeRole" }] }'
+        managed_policies:
+          - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        state: present
+{% endraw %}

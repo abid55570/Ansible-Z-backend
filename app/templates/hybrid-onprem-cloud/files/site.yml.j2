@@ -1,0 +1,48 @@
+{% raw %}---
+- name: Provision hybrid on-prem to cloud connectivity
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - amazon.aws
+  tasks:
+    - name: Cloud VPC
+      amazon.aws.ec2_vpc_net:
+        name: "{{ project_name }}-vpc"
+        cidr_block: "{{ vpc_cidr }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: vpc
+
+    - name: Private subnet
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ subnet_cidr }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: subnet
+
+    - name: VPN gateway attached to the VPC
+      amazon.aws.ec2_vpc_vgw:
+        name: "{{ project_name }}-vgw"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        type: ipsec.1
+        tags: "{{ common_tags }}"
+        state: present
+      register: vgw
+
+    - name: Route to on-prem via the VPN gateway
+      amazon.aws.ec2_vpc_route_table:
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        subnets:
+          - "{{ subnet.subnet.id }}"
+        routes:
+          - dest: "{{ onprem_cidr }}"
+            gateway_id: "{{ vgw.vgw.id }}"
+        tags: "{{ common_tags }}"
+        state: present
+{% endraw %}

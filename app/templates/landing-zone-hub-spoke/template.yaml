@@ -2,9 +2,34 @@ id: landing-zone-hub-spoke
 name: "Hub-and-Spoke Landing Zone"
 version: 0.1.0
 pci: capable
-summary: "Transit Gateway, multi-account, central egress and logging."
-roles: [transit_gateway, hub_vpc, spoke_vpc, central_egress, logging]
+summary: "Transit Gateway hub, spoke VPCs, and central logging."
+roles: [transit_gateway, hub_vpc, spoke_vpc, logging]
+
 variables:
-  org_name: { type: string, required: true }
-  hub_region: { type: string, required: true, example: "ap-south-1" }
-  spoke_count: { type: number, required: false, default: 3 }
+  org_name:
+    type: string
+    required: true
+    example: "acme"
+    guidance:
+      what: "Organization slug used to name resources."
+
+  aws_region:
+    type: string
+    required: true
+    example: "ap-south-1"
+    guidance:
+      what: "Region for the hub and spokes."
+
+  spoke_count:
+    type: number
+    required: false
+    default: 3
+    guidance:
+      what: "Number of spoke VPCs to create."
+
+  hub_cidr:
+    type: cidr
+    required: false
+    default: "10.100.0.0/16"
+    guidance:
+      what: "Hub VPC CIDR."

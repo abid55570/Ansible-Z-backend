@@ -1,0 +1,40 @@
+{% raw %}---
+- name: Provision multi-region DR
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - amazon.aws
+  tasks:
+    - name: Primary VPC
+      amazon.aws.ec2_vpc_net:
+        name: "{{ project_name }}-primary"
+        cidr_block: "{{ vpc_cidr }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: DR VPC (standby region)
+      amazon.aws.ec2_vpc_net:
+        name: "{{ project_name }}-dr"
+        cidr_block: "{{ dr_vpc_cidr }}"
+        region: "{{ dr_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: Backups bucket in primary region (versioned)
+      amazon.aws.s3_bucket:
+        name: "{{ project_name }}-backups-{{ aws_region }}"
+        region: "{{ aws_region }}"
+        versioning: true
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: Backups bucket in DR region (versioned)
+      amazon.aws.s3_bucket:
+        name: "{{ project_name }}-backups-{{ dr_region }}"
+        region: "{{ dr_region }}"
+        versioning: true
+        tags: "{{ common_tags }}"
+        state: present
+{% endraw %}

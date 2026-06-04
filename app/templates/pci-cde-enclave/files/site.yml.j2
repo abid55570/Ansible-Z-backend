@@ -1,0 +1,67 @@
+{% raw %}---
+- name: Provision PCI CDE enclave
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - amazon.aws
+  tasks:
+    - name: Isolated VPC (no internet gateway)
+      amazon.aws.ec2_vpc_net:
+        name: "{{ project_name }}-cde"
+        cidr_block: "{{ cde_cidr }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: vpc
+
+    - name: Private CDE subnet
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ private_subnet_cidr }}"
+        region: "{{ aws_region }}"
+        map_public: false
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: KMS key for cardholder data
+      amazon.aws.kms_key:
+        alias: "{{ project_name }}-cde"
+        region: "{{ aws_region }}"
+        description: "Encrypts cardholder data at rest"
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: CDE security group (SSH from office only)
+      amazon.aws.ec2_security_group:
+        name: "{{ project_name }}-cde-sg"
+        description: "CDE restricted access"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp
+            ports: [22]
+            cidr_ip: "{{ office_ip }}"
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: Encrypted, versioned log bucket
+      amazon.aws.s3_bucket:
+        name: "{{ project_name }}-cde-logs"
+        region: "{{ aws_region }}"
+        versioning: true
+        encryption: "aws:kms"
+        public_access:
+          block_public_acls: true
+          block_public_policy: true
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: CloudTrail audit logging
+      amazon.aws.cloudtrail:
+        name: "{{ project_name }}-trail"
+        region: "{{ aws_region }}"
+        s3_bucket_name: "{{ project_name }}-cde-logs"
+        is_multi_region_trail: true
+        state: present
+{% endraw %}

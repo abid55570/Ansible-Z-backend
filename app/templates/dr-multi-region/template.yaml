@@ -2,9 +2,44 @@ id: dr-multi-region
 name: "Multi-Region DR"
 version: 0.1.0
 pci: none
-summary: "Primary region plus a warm standby region with Route 53 failover."
-roles: [vpc, app, rds_replica, route53_failover]
+summary: "Primary region plus a warm standby region with versioned backups."
+roles: [vpc, app, backups, route53_failover]
+
 variables:
-  project_name: { type: string, required: true }
-  primary_region: { type: string, required: true, example: "ap-south-1" }
-  dr_region: { type: string, required: true, example: "ap-southeast-1" }
+  project_name:
+    type: string
+    required: true
+    example: "shop"
+    guidance:
+      what: "Short slug used to name resources in both regions."
+      how_to_get: "Pick a lowercase name."
+
+  aws_region:
+    type: string
+    required: true
+    example: "ap-south-1"
+    guidance:
+      what: "Primary AWS region."
+      how_to_get: "e.g. ap-south-1 (Mumbai)."
+
+  dr_region:
+    type: string
+    required: true
+    example: "ap-southeast-1"
+    guidance:
+      what: "Disaster-recovery (standby) region."
+      how_to_get: "A different region, e.g. ap-southeast-1 (Singapore)."
+
+  vpc_cidr:
+    type: cidr
+    required: false
+    default: "10.0.0.0/16"
+    guidance:
+      what: "Primary VPC CIDR."
+
+  dr_vpc_cidr:
+    type: cidr
+    required: false
+    default: "10.1.0.0/16"
+    guidance:
+      what: "DR VPC CIDR (must differ from primary)."

@@ -43,12 +43,10 @@ def test_generate_and_download(auth_client, fake_storage):
     assert downloaded.content[:2] == b"PK"  # zip magic number
 
 
-def test_generate_template_not_ready(auth_client, fake_storage):
-    project_id = _make_project(
-        auth_client,
-        slug="k8s-platform",
-        config={"cluster_name": "c", "aws_region": "ap-south-1"},
-    )
+def test_generate_template_not_ready(auth_client, fake_storage, monkeypatch):
+    # All catalogue templates are generatable now, so simulate a not-yet-ready one.
+    monkeypatch.setattr("app.routers.projects.template_is_ready", lambda slug: False)
+    project_id = _make_project(auth_client)
     assert auth_client.post(f"/projects/{project_id}/generate", json={"env": "uat"}).status_code == 409
 
 

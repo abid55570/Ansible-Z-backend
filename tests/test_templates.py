@@ -8,8 +8,8 @@ def test_list_templates(client):
 
     web = next(t for t in data if t["slug"] == "web-3tier")
     assert web["ready"] is True
-    k8s = next(t for t in data if t["slug"] == "k8s-platform")
-    assert k8s["ready"] is False
+    # all 11 templates are now generatable
+    assert all(t["ready"] for t in data)
 
 
 def test_template_detail(client):

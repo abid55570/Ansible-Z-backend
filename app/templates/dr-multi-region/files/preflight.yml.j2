@@ -1,0 +1,20 @@
+{% raw %}---
+- name: Preflight checks
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Verify AWS credentials
+      amazon.aws.aws_caller_info:
+      register: caller
+
+    - name: Show identity
+      ansible.builtin.debug:
+        msg: "Authenticated to AWS account {{ caller.account }}"
+
+    - name: Assert region is set
+      ansible.builtin.assert:
+        that:
+          - aws_region | length > 0
+        fail_msg: "Set aws_region in group_vars/all.yml"
+{% endraw %}
