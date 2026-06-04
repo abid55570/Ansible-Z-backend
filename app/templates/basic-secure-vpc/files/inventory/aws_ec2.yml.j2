@@ -1,0 +1,9 @@
+---
+plugin: amazon.aws.aws_ec2
+regions:
+  - {{ aws_region }}
+keyed_groups:
+  - key: tags.Role
+    prefix: role
+filters:
+  instance-state-name: running

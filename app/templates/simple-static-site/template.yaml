@@ -1,0 +1,54 @@
+id: simple-static-site
+name: "Simple Static Site (starter)"
+version: 0.1.0
+pci: none
+summary: "An S3 bucket configured for public static website hosting — host a site with no servers."
+roles: [s3_bucket, s3_website]
+
+variables:
+  project_name:
+    type: string
+    required: true
+    example: "my-site"
+    guidance:
+      what: "Short slug used to tag resources."
+      how_to_get: "Pick a lowercase name, e.g. 'my-site'."
+
+  aws_region:
+    type: string
+    required: true
+    example: "ap-south-1"
+    guidance:
+      what: "AWS region for the bucket."
+      how_to_get: "Mumbai = ap-south-1, Singapore = ap-southeast-1."
+
+  bucket_name:
+    type: string
+    required: true
+    example: "my-site-www-12345"
+    guidance:
+      what: "Globally-unique S3 bucket name (becomes the website host)."
+      how_to_get: "Must be globally unique, lowercase, no spaces; add a random suffix."
+
+  index_document:
+    type: string
+    required: false
+    default: "index.html"
+    guidance:
+      what: "Default document served at the site root."
+      how_to_get: "Usually index.html."
+
+  error_document:
+    type: string
+    required: false
+    default: "error.html"
+    guidance:
+      what: "Document served on 4xx errors."
+      how_to_get: "Usually error.html or 404.html."
+
+diagram:
+  nodes:
+    - { id: bucket, type: s3_bucket, label: "S3 bucket" }
+    - { id: site, type: s3_website, label: "Website hosting" }
+  edges:
+    - { from: bucket, to: site, port: bucket }

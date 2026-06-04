@@ -1,0 +1,55 @@
+id: basic-secure-vpc
+name: "Basic Secure VPC (starter)"
+version: 0.1.0
+pci: capable
+summary: "A secure network foundation: public + private subnets, IGW, NAT egress, and a locked-down base SG."
+roles: [vpc, subnets, igw, nat_gateway, security_group]
+
+variables:
+  project_name:
+    type: string
+    required: true
+    example: "my-network"
+    guidance:
+      what: "Short slug used to name and tag all resources."
+      how_to_get: "Pick a lowercase name, e.g. 'my-network'."
+
+  aws_region:
+    type: string
+    required: true
+    example: "ap-south-1"
+    guidance:
+      what: "AWS region to deploy into."
+      how_to_get: "Mumbai = ap-south-1, Singapore = ap-southeast-1."
+
+  vpc_cidr:
+    type: cidr
+    required: true
+    default: "10.40.0.0/16"
+    guidance:
+      what: "Top-level network range for the VPC."
+      how_to_get: "Use a /16 that does not overlap any peered network."
+
+  office_ip:
+    type: cidr
+    required: true
+    scope: [uat, prod]
+    example: "203.0.113.10/32"
+    guidance:
+      what: "The only public IP allowed to SSH into this network."
+      how_to_get: "Run: curl https://checkip.amazonaws.com  then append /32"
+
+diagram:
+  nodes:
+    - { id: vpc, type: vpc, label: "VPC" }
+    - { id: igw, type: igw, label: "Internet gateway" }
+    - { id: pub, type: subnet, label: "Public subnet" }
+    - { id: priv, type: subnet, label: "Private subnet" }
+    - { id: nat, type: nat_gateway, label: "NAT gateway" }
+    - { id: sg, type: security_group, label: "Base SG (SSH from office)" }
+  edges:
+    - { from: vpc, to: igw, port: vpc }
+    - { from: vpc, to: pub, port: vpc }
+    - { from: vpc, to: priv, port: vpc }
+    - { from: pub, to: nat, port: subnet }
+    - { from: vpc, to: sg, port: vpc }

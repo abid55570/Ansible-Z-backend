@@ -21,6 +21,7 @@ IR = {
         {"id": "nat1", "type": "nat_gateway", "props": {}, "inputs": {"subnet": "pub1"}},
         {"id": "rt1", "type": "route_table", "props": {}, "inputs": {"vpc": "vpc1", "subnets": ["pub1"]}},
         {"id": "logs", "type": "s3_bucket", "props": {"bucket_name": "demo-logs", "versioning": True}},
+        {"id": "site1", "type": "s3_website", "props": {}, "inputs": {"bucket": "logs"}},
         {"id": "tg1", "type": "target_group", "props": {}, "inputs": {"vpc": "vpc1"}},
         {"id": "lt1", "type": "launch_template", "props": {}},
         {"id": "fn1", "type": "lambda", "props": {}},

@@ -1,0 +1,76 @@
+id: single-vm-app
+name: "Single VM App (starter)"
+version: 0.1.0
+pci: none
+summary: "One Docker-ready EC2 instance in a public subnet — provision, then ship apps with the Day-2 layer."
+roles: [vpc, security_group, ec2_instance]
+
+variables:
+  project_name:
+    type: string
+    required: true
+    example: "my-app"
+    guidance:
+      what: "Short slug used to name and tag all resources."
+      how_to_get: "Pick a lowercase name, e.g. 'my-app'."
+
+  aws_region:
+    type: string
+    required: true
+    example: "ap-south-1"
+    guidance:
+      what: "AWS region to deploy into."
+      how_to_get: "Mumbai = ap-south-1, Singapore = ap-southeast-1."
+
+  vpc_cidr:
+    type: cidr
+    required: true
+    default: "10.30.0.0/16"
+    guidance:
+      what: "Network range for the VPC."
+      how_to_get: "Any /16 that does not overlap your other networks."
+
+  instance_type:
+    type: string
+    required: true
+    default: "t3.small"
+    guidance:
+      what: "EC2 instance size."
+      how_to_get: "t3.small is a low-cost starting point; size up later."
+
+  ami_id:
+    type: string
+    required: false
+    guidance:
+      what: "AMI to launch (set before running)."
+      how_to_get: "EC2 console -> AMIs; pick a recent Ubuntu 22.04 image for your region."
+
+  key_name:
+    type: string
+    required: false
+    guidance:
+      what: "Existing EC2 key pair name for SSH."
+      how_to_get: "EC2 console -> Key Pairs -> create or copy the name."
+
+  office_ip:
+    type: cidr
+    required: true
+    scope: [uat, prod]
+    example: "203.0.113.10/32"
+    guidance:
+      what: "The only public IP allowed to SSH the instance."
+      how_to_get: "Run: curl https://checkip.amazonaws.com  then append /32"
+
+diagram:
+  nodes:
+    - { id: vpc, type: vpc, label: "VPC" }
+    - { id: subnet, type: subnet, label: "Public subnet" }
+    - { id: igw, type: igw, label: "Internet gateway" }
+    - { id: sg, type: security_group, label: "App SG (SSH/HTTP/HTTPS)" }
+    - { id: app, type: ec2_instance, label: "App VM (Role=app)" }
+  edges:
+    - { from: vpc, to: subnet, port: vpc }
+    - { from: vpc, to: igw, port: vpc }
+    - { from: vpc, to: sg, port: vpc }
+    - { from: subnet, to: app, port: subnet }
+    - { from: sg, to: app, port: security_group }

@@ -186,6 +186,18 @@ def _s3_bucket(node, refs, ctx):
     }
 
 
+def _s3_website(node, refs, ctx):
+    return {
+        "name": f"S3 website: {node['id']}",
+        "community.aws.s3_website": {
+            "name": refs["bucket"],
+            "suffix": node["props"].get("index_document", "index.html"),
+            "error_key": node["props"].get("error_document", "error.html"),
+            "state": "present",
+        },
+    }
+
+
 def _target_group(node, refs, ctx):
     return {
         "name": f"Target group: {node['id']}",
@@ -470,6 +482,15 @@ BLOCKS: dict[str, dict] = {
         },
         "output": "name",
         "render": _s3_bucket,
+    },
+    "s3_website": {
+        "inputs": {"bucket": {"type": "s3_bucket", "many": False}},
+        "props": {
+            "index_document": {"type": "string", "default": "index.html", "guidance": "Root document."},
+            "error_document": {"type": "string", "default": "error.html", "guidance": "4xx error document."},
+        },
+        "output": "website_endpoint",
+        "render": _s3_website,
     },
     "target_group": {
         "inputs": {"vpc": {"type": "vpc", "many": False}},

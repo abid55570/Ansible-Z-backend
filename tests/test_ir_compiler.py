@@ -99,6 +99,7 @@ ALL_BLOCKS_IR = {
         {"id": "nat", "type": "nat_gateway", "props": {}, "inputs": {"subnet": "pub"}},
         {"id": "rt", "type": "route_table", "props": {}, "inputs": {"vpc": "vpc", "subnets": ["pub"]}},
         {"id": "bucket", "type": "s3_bucket", "props": {"bucket_name": "my-bucket", "versioning": True}},
+        {"id": "site", "type": "s3_website", "props": {}, "inputs": {"bucket": "bucket"}},
         {"id": "tg", "type": "target_group", "props": {}, "inputs": {"vpc": "vpc"}},
         {"id": "lt", "type": "launch_template", "props": {}},
         {"id": "fn", "type": "lambda", "props": {}},
@@ -122,7 +123,7 @@ def test_all_blocks_compile_to_valid_yaml():
     report = lint_files(files)
     assert report["status"] == "passed", report["errors"]
     site = files["site.yml"]
-    for marker in ("Internet gateway", "NAT gateway", "Route table", "S3 bucket", "Target group",
+    for marker in ("Internet gateway", "NAT gateway", "Route table", "S3 bucket", "S3 website", "Target group",
                    "Launch template", "Lambda function", "DynamoDB table", "KMS key", "IAM role",
                    "EKS cluster", "EKS node group", "Transit gateway", "VPN gateway", "CloudTrail",
                    "API gateway", "EventBridge rule", "VPC endpoint"):

@@ -1,0 +1,36 @@
+{% raw %}---
+# Simple static website: an S3 bucket with public-read website hosting.
+# Values come from group_vars/all.yml (auto-loaded).
+- name: Provision static website
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - amazon.aws
+    - community.aws
+  tasks:
+    - name: Create the website bucket
+      amazon.aws.s3_bucket:
+        name: "{{ bucket_name }}"
+        region: "{{ aws_region }}"
+        public_access:
+          block_public_acls: false
+          block_public_policy: false
+          ignore_public_acls: false
+          restrict_public_buckets: false
+        policy: "{{ bucket_policy | to_json }}"
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: Configure static website hosting
+      community.aws.s3_website:
+        name: "{{ bucket_name }}"
+        suffix: "{{ index_document }}"
+        error_key: "{{ error_document }}"
+        state: present
+      register: website
+
+    - name: Show the website endpoint
+      ansible.builtin.debug:
+        msg: "Website endpoint: {{ website.website_endpoint | default('(see the S3 console)') }}"
+{% endraw %}

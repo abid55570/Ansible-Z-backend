@@ -1,0 +1,96 @@
+{% raw %}---
+# Single VM app: VPC + public subnet + security group + one EC2 instance.
+# The instance is tagged Role=app so the Day-2 deploy.yml targets it.
+# Values come from group_vars/all.yml (auto-loaded).
+- name: Provision single VM app
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - amazon.aws
+    - community.aws
+  tasks:
+    - name: Create VPC
+      amazon.aws.ec2_vpc_net:
+        name: "{{ project_name }}-{{ environment_name }}-vpc"
+        cidr_block: "{{ vpc_cidr }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: vpc
+
+    - name: Internet gateway
+      amazon.aws.ec2_vpc_igw:
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: igw
+
+    - name: Public subnet
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ public_subnet_cidr }}"
+        region: "{{ aws_region }}"
+        map_public: true
+        tags: "{{ common_tags | combine({'Name': project_name + '-public', 'Role': 'public'}) }}"
+        state: present
+      register: public_subnet
+
+    - name: Public route table to the internet gateway
+      amazon.aws.ec2_vpc_route_table:
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        subnets:
+          - "{{ public_subnet.subnet.id }}"
+        routes:
+          - dest: 0.0.0.0/0
+            gateway_id: "{{ igw.gateway_id }}"
+        tags: "{{ common_tags | combine({'Name': project_name + '-public-rt'}) }}"
+        state: present
+
+    - name: Application security group
+      amazon.aws.ec2_security_group:
+        name: "{{ project_name }}-app-sg"
+        description: "SSH from office, HTTP/HTTPS from anywhere"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp
+            ports: [22]
+            cidr_ip: "{{ office_ip }}"
+            rule_desc: "SSH from office"
+          - proto: tcp
+            ports: [80]
+            cidr_ip: 0.0.0.0/0
+            rule_desc: "HTTP"
+          - proto: tcp
+            ports: [443]
+            cidr_ip: 0.0.0.0/0
+            rule_desc: "HTTPS"
+        tags: "{{ common_tags }}"
+        state: present
+      register: app_sg
+
+    - name: App VM (Docker-ready via cloud-init)
+      amazon.aws.ec2_instance:
+        name: "{{ project_name }}-app"
+        region: "{{ aws_region }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ ami_id }}"
+        key_name: "{{ key_name | default(omit, true) }}"
+        vpc_subnet_id: "{{ public_subnet.subnet.id }}"
+        security_groups:
+          - "{{ app_sg.group_id }}"
+        network:
+          assign_public_ip: true
+        tags: "{{ common_tags | combine({'Role': 'app'}) }}"
+        user_data: |
+          #cloud-config
+          package_update: true
+          packages:
+            - docker.io
+          runcmd:
+            - systemctl enable --now docker
+        state: started
+{% endraw %}

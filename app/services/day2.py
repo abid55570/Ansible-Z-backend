@@ -156,10 +156,17 @@ and let you ship updates — no extra Ansible to write.
 
 ## One-time
 
+Install the collection these playbooks use:
+
+```bash
+ansible-galaxy collection install community.docker
+```
+
 Your app servers must be reachable over SSH and have Docker installed, and the
 instances that should run apps must be tagged `Role=app` (the dynamic inventory
 groups them as `role_app`). Override the target group by editing `app_host_group`
-in `apps.yml`.
+in `apps.yml`. (The `single-vm-app` starter template installs Docker for you via
+cloud-init.)
 
 ## Deploy / update
 
