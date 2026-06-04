@@ -134,6 +134,145 @@ def _rds(node, refs, ctx):
     ]
 
 
+def _igw(node, refs, ctx):
+    return {
+        "name": f"Internet gateway: {node['id']}",
+        "amazon.aws.ec2_vpc_igw": {
+            "vpc_id": refs["vpc"],
+            "region": ctx["region"],
+            "tags": TAGS,
+            "state": "present",
+        },
+    }
+
+
+def _nat_gateway(node, refs, ctx):
+    return {
+        "name": f"NAT gateway: {node['id']}",
+        "amazon.aws.ec2_vpc_nat_gateway": {
+            "subnet_id": refs["subnet"],
+            "region": ctx["region"],
+            "wait": True,
+            "if_exist_do_not_create": True,
+            "tags": TAGS,
+            "state": "present",
+        },
+    }
+
+
+def _route_table(node, refs, ctx):
+    return {
+        "name": f"Route table: {node['id']}",
+        "amazon.aws.ec2_vpc_route_table": {
+            "vpc_id": refs["vpc"],
+            "region": ctx["region"],
+            "subnets": refs["subnets"],
+            "tags": TAGS,
+            "state": "present",
+        },
+    }
+
+
+def _s3_bucket(node, refs, ctx):
+    return {
+        "name": f"S3 bucket: {node['id']}",
+        "amazon.aws.s3_bucket": {
+            "name": node["props"].get("bucket_name", node["id"]),
+            "region": ctx["region"],
+            "versioning": node["props"].get("versioning", False),
+            "tags": TAGS,
+            "state": "present",
+        },
+    }
+
+
+def _target_group(node, refs, ctx):
+    return {
+        "name": f"Target group: {node['id']}",
+        "community.aws.elb_target_group": {
+            "name": node["props"].get("name", node["id"]),
+            "region": ctx["region"],
+            "protocol": node["props"].get("protocol", "HTTP"),
+            "port": node["props"].get("port", 80),
+            "vpc_id": refs["vpc"],
+            "target_type": "instance",
+            "health_check_path": node["props"].get("health_check_path", "/"),
+            "state": "present",
+        },
+    }
+
+
+def _launch_template(node, refs, ctx):
+    return {
+        "name": f"Launch template: {node['id']}",
+        "amazon.aws.ec2_launch_template": {
+            "name": node["props"].get("name", node["id"]),
+            "region": ctx["region"],
+            "instance_type": node["props"].get("instance_type", "t3.micro"),
+            "image_id": node["props"].get("ami", "{{ default_ami }}"),
+            "tags": TAGS,
+        },
+    }
+
+
+def _lambda(node, refs, ctx):
+    return {
+        "name": f"Lambda function: {node['id']}",
+        "amazon.aws.lambda": {
+            "name": node["props"].get("name", node["id"]),
+            "region": ctx["region"],
+            "runtime": node["props"].get("runtime", "python3.12"),
+            "handler": node["props"].get("handler", "app.handler"),
+            "role": node["props"].get("role_arn", "arn:aws:iam::000000000000:role/lambda-exec"),
+            "zip_file": node["props"].get("zip_file", "build/function.zip"),
+            "state": "present",
+        },
+    }
+
+
+def _dynamodb(node, refs, ctx):
+    return {
+        "name": f"DynamoDB table: {node['id']}",
+        "community.aws.dynamodb_table": {
+            "name": node["props"].get("table_name", node["id"]),
+            "region": ctx["region"],
+            "hash_key_name": node["props"].get("hash_key", "id"),
+            "hash_key_type": "STRING",
+            "billing_mode": "PAY_PER_REQUEST",
+            "tags": TAGS,
+            "state": "present",
+        },
+    }
+
+
+def _kms_key(node, refs, ctx):
+    return {
+        "name": f"KMS key: {node['id']}",
+        "amazon.aws.kms_key": {
+            "alias": node["props"].get("alias", node["id"]),
+            "region": ctx["region"],
+            "description": node["props"].get("description", node["id"]),
+            "tags": TAGS,
+            "state": "present",
+        },
+    }
+
+
+def _iam_role(node, refs, ctx):
+    return {
+        "name": f"IAM role: {node['id']}",
+        "amazon.aws.iam_role": {
+            "name": node["props"].get("name", node["id"]),
+            "assume_role_policy_document": node["props"].get(
+                "assume_role_policy",
+                '{ "Version": "2012-10-17", "Statement": [{ "Effect": "Allow", '
+                '"Principal": {"Service": "ec2.amazonaws.com"}, "Action": "sts:AssumeRole" }] }',
+            ),
+            "state": "present",
+        },
+    }
+
+
 BLOCKS: dict[str, dict] = {
     "vpc": {
         "inputs": {},
@@ -201,5 +340,92 @@ BLOCKS: dict[str, dict] = {
         },
         "output": "endpoint",
         "render": _rds,
+    },
+    "igw": {
+        "inputs": {"vpc": {"type": "vpc", "many": False}},
+        "props": {},
+        "output": "gateway_id",
+        "render": _igw,
+    },
+    "nat_gateway": {
+        "inputs": {"subnet": {"type": "subnet", "many": False}},
+        "props": {},
+        "output": "nat_gateway_id",
+        "render": _nat_gateway,
+    },
+    "route_table": {
+        "inputs": {"vpc": {"type": "vpc", "many": False}, "subnets": {"type": "subnet", "many": True}},
+        "props": {},
+        "output": "route_table.id",
+        "render": _route_table,
+    },
+    "s3_bucket": {
+        "inputs": {},
+        "props": {
+            "bucket_name": {"type": "string", "guidance": "Globally-unique bucket name."},
+            "versioning": {"type": "bool", "default": False, "guidance": "Enable object versioning?"},
+        },
+        "output": "name",
+        "render": _s3_bucket,
+    },
+    "target_group": {
+        "inputs": {"vpc": {"type": "vpc", "many": False}},
+        "props": {
+            "name": {"type": "string"},
+            "protocol": {"type": "string", "default": "HTTP"},
+            "port": {"type": "number", "default": 80},
+            "health_check_path": {"type": "string", "default": "/"},
+        },
+        "output": "target_group_arn",
+        "render": _target_group,
+    },
+    "launch_template": {
+        "inputs": {},
+        "props": {
+            "name": {"type": "string"},
+            "instance_type": {"type": "string", "default": "t3.micro"},
+            "ami": {"type": "string", "guidance": "AMI id (e.g. a Packer golden image)."},
+        },
+        "output": "template.launch_template_id",
+        "render": _launch_template,
+    },
+    "lambda": {
+        "inputs": {},
+        "props": {
+            "name": {"type": "string"},
+            "runtime": {"type": "string", "default": "python3.12"},
+            "handler": {"type": "string", "default": "app.handler"},
+            "role_arn": {"type": "string", "guidance": "Execution role ARN."},
+            "zip_file": {"type": "string", "default": "build/function.zip"},
+        },
+        "output": "configuration.function_arn",
+        "render": _lambda,
+    },
+    "dynamodb": {
+        "inputs": {},
+        "props": {
+            "table_name": {"type": "string"},
+            "hash_key": {"type": "string", "default": "id"},
+        },
+        "output": "table_arn",
+        "render": _dynamodb,
+    },
+    "kms_key": {
+        "inputs": {},
+        "props": {
+            "alias": {"type": "string", "guidance": "Key alias."},
+            "description": {"type": "string"},
+        },
+        "output": "key_id",
+        "render": _kms_key,
+    },
+    "iam_role": {
+        "inputs": {},
+        "props": {
+            "name": {"type": "string"},
+            "assume_role_policy": {"type": "string", "guidance": "Trust policy JSON."},
+        },
+        "output": "arn",
+        "render": _iam_role,
     },
 }
