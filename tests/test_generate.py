@@ -8,6 +8,20 @@ WEB3_CONFIG = {
 }
 
 
+CUSTOM_IR = {
+    "version": 1,
+    "provider": "aws",
+    "region": "ap-south-1",
+    "name": "my-design",
+    "nodes": [
+        {"id": "vpc1", "type": "vpc", "props": {"cidr": "10.0.0.0/16"}},
+        {"id": "pub1", "type": "subnet", "props": {"cidr": "10.0.1.0/24", "public": True}, "inputs": {"vpc": "vpc1"}},
+        {"id": "sg1", "type": "security_group", "props": {"ingress": [{"port": 80}]}, "inputs": {"vpc": "vpc1"}},
+        {"id": "web", "type": "ec2_instance", "props": {}, "inputs": {"subnet": "pub1", "security_group": "sg1"}},
+    ],
+}
+
+
 def _make_project(auth_client, slug="web-3tier", config=None):
     response = auth_client.post(
         "/projects",
@@ -79,3 +93,18 @@ def test_generate_deep_lint_failure(auth_client, fake_storage, monkeypatch):
     )
     project_id = _make_project(auth_client)
     assert auth_client.post(f"/projects/{project_id}/generate", json={"env": "uat"}).status_code == 422
+
+
+def test_generate_custom_design(auth_client, fake_storage):
+    project_id = _make_project(auth_client, slug="__custom__", config=CUSTOM_IR)
+    generated = auth_client.post(f"/projects/{project_id}/generate", json={"env": "uat"})
+    assert generated.status_code == 200, generated.text
+
+    downloaded = auth_client.get(f"/projects/{project_id}/download", params={"env": "uat"})
+    assert downloaded.status_code == 200
+    assert downloaded.content[:2] == b"PK"
+
+
+def test_generate_custom_design_invalid(auth_client, fake_storage):
+    project_id = _make_project(auth_client, slug="__custom__", config={"region": "r", "name": "n", "nodes": []})
+    assert auth_client.post(f"/projects/{project_id}/generate", json={"env": "uat"}).status_code == 400

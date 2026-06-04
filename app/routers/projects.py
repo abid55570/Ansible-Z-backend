@@ -8,6 +8,7 @@ from app.db import get_db
 from app.deps import get_current_user
 from app.models import Generation, Project, User
 from app.schemas import GenerateIn, GenerationOut, ProjectCreate, ProjectOut
+from app.ir.compiler import IRError, compile_ir
 from app.services import ansible_check, linter, packager, storage
 from app.services.generator import TemplateError, load_manifest, render_project, template_is_ready
 
@@ -27,10 +28,11 @@ def create_project(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Project:
-    try:
-        load_manifest(body.template_slug)
-    except TemplateError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if body.template_slug != "__custom__":
+        try:
+            load_manifest(body.template_slug)
+        except TemplateError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     project = Project(user_id=user.id, name=body.name, template_slug=body.template_slug, config=body.config)
     db.add(project)
@@ -62,13 +64,18 @@ def generate(
 ) -> Generation:
     project = _get_owned_project(project_id, user, db)
 
-    if not template_is_ready(project.template_slug):
-        raise HTTPException(status_code=409, detail="Template is not ready for generation yet")
-
-    try:
-        files = render_project(project.template_slug, project.config, env=body.env)
-    except TemplateError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if project.template_slug == "__custom__":
+        try:
+            files = compile_ir(project.config)
+        except IRError as exc:
+            raise HTTPException(status_code=400, detail={"message": "Invalid design", "errors": exc.errors}) from exc
+    else:
+        if not template_is_ready(project.template_slug):
+            raise HTTPException(status_code=409, detail="Template is not ready for generation yet")
+        try:
+            files = render_project(project.template_slug, project.config, env=body.env)
+        except TemplateError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     report = linter.lint_files(files)
     if report["status"] == "failed":
