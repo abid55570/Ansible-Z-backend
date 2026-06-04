@@ -8,3 +8,14 @@ variables:
   project_name: { type: string, required: true }
   aws_region: { type: string, required: true }
   onprem_cidr: { type: cidr, required: true, example: "192.168.0.0/16" }
+
+diagram:
+  nodes:
+    - { id: onprem, type: datacenter, label: "On-prem network" }
+    - { id: vgw, type: vpn_gateway, label: "VPN gateway" }
+    - { id: vpc, type: vpc, label: "Cloud VPC" }
+    - { id: subnet, type: subnet, label: "Private subnet" }
+  edges:
+    - { from: onprem, to: vgw }
+    - { from: vgw, to: vpc }
+    - { from: vpc, to: subnet, port: vpc }

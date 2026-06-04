@@ -8,3 +8,16 @@ variables:
   project_name: { type: string, required: true }
   aws_region: { type: string, required: true }
   base_ami: { type: string, required: false }
+
+diagram:
+  nodes:
+    - { id: vpc, type: vpc, label: "VPC" }
+    - { id: lt, type: launch_template, label: "Golden AMI LT" }
+    - { id: blue, type: target_group, label: "Blue TG" }
+    - { id: green, type: target_group, label: "Green TG" }
+    - { id: alb, type: alb, label: "ALB" }
+  edges:
+    - { from: vpc, to: alb }
+    - { from: alb, to: blue }
+    - { from: alb, to: green }
+    - { from: lt, to: blue }

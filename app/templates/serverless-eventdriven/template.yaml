@@ -8,3 +8,14 @@ variables:
   project_name: { type: string, required: true }
   aws_region: { type: string, required: true }
   runtime: { type: string, required: false, default: "python3.12" }
+
+diagram:
+  nodes:
+    - { id: api, type: api_gateway, label: "API Gateway" }
+    - { id: lambda, type: lambda, label: "Lambda" }
+    - { id: ddb, type: dynamodb, label: "DynamoDB" }
+    - { id: events, type: eventbridge, label: "EventBridge" }
+  edges:
+    - { from: api, to: lambda }
+    - { from: lambda, to: ddb }
+    - { from: events, to: lambda }

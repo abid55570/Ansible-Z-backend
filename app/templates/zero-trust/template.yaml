@@ -8,3 +8,17 @@ variables:
   project_name: { type: string, required: true }
   aws_region: { type: string, required: true }
   idp_domain: { type: string, required: false }
+
+diagram:
+  nodes:
+    - { id: vpc, type: vpc, label: "VPC" }
+    - { id: subnet, type: subnet, label: "Private subnet" }
+    - { id: sg, type: security_group, label: "Endpoint SG" }
+    - { id: ssm, type: vpc_endpoint, label: "SSM endpoints" }
+    - { id: role, type: iam_role, label: "SSM role" }
+  edges:
+    - { from: vpc, to: subnet, port: vpc }
+    - { from: vpc, to: sg, port: vpc }
+    - { from: subnet, to: ssm }
+    - { from: sg, to: ssm }
+    - { from: role, to: subnet }

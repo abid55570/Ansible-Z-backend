@@ -22,9 +22,10 @@ def test_template_detail(client):
     assert body["diagram"]["nodes"] and body["diagram"]["edges"]
 
 
-def test_stub_template_has_no_diagram(client):
-    body = client.get("/templates/k8s-platform").json()
-    assert body["diagram"] is None
+def test_every_template_has_a_diagram(client):
+    for summary in client.get("/templates").json():
+        detail = client.get(f"/templates/{summary['slug']}").json()
+        assert detail["diagram"] and detail["diagram"]["nodes"], f"{summary['slug']} has no diagram"
 
 
 def test_template_detail_unknown(client):

@@ -43,3 +43,14 @@ variables:
     default: "10.1.0.0/16"
     guidance:
       what: "DR VPC CIDR (must differ from primary)."
+
+diagram:
+  nodes:
+    - { id: vpc_primary, type: vpc, label: "Primary VPC" }
+    - { id: vpc_dr, type: vpc, label: "DR VPC" }
+    - { id: backups_primary, type: s3_bucket, label: "Backups (primary)" }
+    - { id: backups_dr, type: s3_bucket, label: "Backups (DR)" }
+  edges:
+    - { from: vpc_primary, to: backups_primary }
+    - { from: vpc_dr, to: backups_dr }
+    - { from: vpc_primary, to: vpc_dr }

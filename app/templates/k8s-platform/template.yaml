@@ -8,3 +8,17 @@ variables:
   cluster_name: { type: string, required: true }
   aws_region: { type: string, required: true }
   node_count: { type: number, required: false, default: 3 }
+
+diagram:
+  nodes:
+    - { id: vpc, type: vpc, label: "VPC" }
+    - { id: subnet_a, type: subnet, label: "Subnet A" }
+    - { id: subnet_b, type: subnet, label: "Subnet B" }
+    - { id: eks, type: eks_cluster, label: "EKS cluster" }
+    - { id: nodes, type: eks_nodegroup, label: "Node group" }
+  edges:
+    - { from: vpc, to: subnet_a, port: vpc }
+    - { from: vpc, to: subnet_b, port: vpc }
+    - { from: subnet_a, to: eks }
+    - { from: subnet_b, to: eks }
+    - { from: eks, to: nodes }

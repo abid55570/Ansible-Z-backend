@@ -9,3 +9,17 @@ variables:
   aws_region: { type: string, required: true }
   cde_cidr: { type: cidr, required: true, default: "10.50.0.0/24" }
   office_ip: { type: cidr, required: true, scope: [uat, prod] }
+
+diagram:
+  nodes:
+    - { id: vpc, type: vpc, label: "Isolated VPC (no IGW)" }
+    - { id: subnet, type: subnet, label: "Private CDE subnet" }
+    - { id: sg, type: security_group, label: "Restricted SG" }
+    - { id: kms, type: kms_key, label: "KMS key" }
+    - { id: logs, type: s3_bucket, label: "Encrypted logs" }
+    - { id: trail, type: cloudtrail, label: "CloudTrail" }
+  edges:
+    - { from: vpc, to: subnet, port: vpc }
+    - { from: vpc, to: sg, port: vpc }
+    - { from: kms, to: logs }
+    - { from: logs, to: trail }

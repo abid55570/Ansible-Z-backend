@@ -33,3 +33,16 @@ variables:
     default: "10.100.0.0/16"
     guidance:
       what: "Hub VPC CIDR."
+
+diagram:
+  nodes:
+    - { id: tgw, type: transit_gateway, label: "Transit Gateway" }
+    - { id: hub, type: vpc, label: "Hub VPC" }
+    - { id: spoke1, type: vpc, label: "Spoke VPC 1" }
+    - { id: spoke2, type: vpc, label: "Spoke VPC 2" }
+    - { id: logs, type: s3_bucket, label: "Central logs" }
+  edges:
+    - { from: hub, to: tgw }
+    - { from: spoke1, to: tgw }
+    - { from: spoke2, to: tgw }
+    - { from: hub, to: logs }
