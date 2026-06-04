@@ -9,7 +9,7 @@ from app.deps import get_current_user
 from app.models import Generation, Project, User
 from app.schemas import GenerateIn, GenerationOut, ProjectCreate, ProjectOut
 from app.ir.compiler import IRError, compile_ir
-from app.services import ansible_check, linter, packager, storage
+from app.services import ansible_check, day2, linter, packager, storage
 from app.services.generator import TemplateError, load_manifest, render_project, template_is_ready
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -77,17 +77,22 @@ def generate(
         except TemplateError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    # Merge the Day-2 ops layer (deploy/update/rollback apps); a template that
+    # ships its own deploy.yml keeps it.
+    files = {**day2.day2_files(), **files}
+
     report = linter.lint_files(files)
     if report["status"] == "failed":
         raise HTTPException(status_code=422, detail={"message": "Generated project failed lint", "report": report})
 
     if get_settings().deep_lint:
-        deep = ansible_check.syntax_check(files)
-        if deep["status"] == "failed":
-            raise HTTPException(
-                status_code=422,
-                detail={"message": "ansible --syntax-check failed", "report": deep},
-            )
+        for playbook in ("site.yml", "deploy.yml", "rollback.yml"):
+            deep = ansible_check.syntax_check(files, playbook=playbook)
+            if deep["status"] == "failed":
+                raise HTTPException(
+                    status_code=422,
+                    detail={"message": f"ansible --syntax-check failed: {playbook}", "report": deep},
+                )
 
     blob = packager.zip_files(files)
     key = f"generations/{project.id}/{body.env}-{uuid.uuid4().hex[:8]}.zip"

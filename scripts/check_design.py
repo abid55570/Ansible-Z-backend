@@ -2,6 +2,7 @@
 
 from app.ir.compiler import compile_ir
 from app.services.ansible_check import ansible_available, syntax_check
+from app.services.day2 import day2_files
 
 IR = {
     "version": 1,
@@ -38,9 +39,10 @@ IR = {
 }
 
 print("ansible-playbook available:", ansible_available())
-files = compile_ir(IR)
+files = {**day2_files(), **compile_ir(IR)}
 print("compiled files:", sorted(files))
-report = syntax_check(files)
-print("syntax-check:", report["status"])
-if report.get("output"):
-    print(report["output"])
+for playbook in ("site.yml", "deploy.yml", "rollback.yml"):
+    report = syntax_check(files, playbook=playbook)
+    print(f"syntax-check {playbook}:", report["status"])
+    if report.get("output"):
+        print(report["output"])
