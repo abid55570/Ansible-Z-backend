@@ -128,6 +128,7 @@ def get_template_detail(slug: str) -> dict:
             "version": str(manifest.get("version", "")),
             "roles": manifest.get("roles", []),
             "variables": manifest.get("variables", {}),
+            "diagram": manifest.get("diagram"),
         }
     )
     return detail

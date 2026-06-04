@@ -47,3 +47,26 @@ variables:
     guidance:
       what: "ACM certificate ARN for the ALB HTTPS:443 listener."
       how_to_get: "AWS Console -> Certificate Manager (same region) -> request -> copy ARN."
+
+diagram:
+  nodes:
+    - { id: vpc, type: vpc, label: "VPC 10.20.0.0/16" }
+    - { id: pub, type: subnet, label: "Public subnet" }
+    - { id: priv, type: subnet, label: "Private subnet" }
+    - { id: sg, type: security_group, label: "Security groups" }
+    - { id: bastion, type: ec2_instance, label: "Bastion (public)" }
+    - { id: alb, type: alb, label: "ALB (public)" }
+    - { id: app, type: ec2_instance, label: "App tier (private)" }
+    - { id: db, type: rds, label: "RDS (private)" }
+  edges:
+    - { from: vpc, to: pub, port: vpc }
+    - { from: vpc, to: priv, port: vpc }
+    - { from: vpc, to: sg, port: vpc }
+    - { from: pub, to: bastion, port: subnet }
+    - { from: sg, to: bastion, port: security_group }
+    - { from: pub, to: alb, port: subnets }
+    - { from: sg, to: alb, port: security_group }
+    - { from: priv, to: app, port: subnet }
+    - { from: sg, to: app, port: security_group }
+    - { from: priv, to: db, port: subnets }
+    - { from: alb, to: app }

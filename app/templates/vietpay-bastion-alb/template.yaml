@@ -47,3 +47,29 @@ variables:
     guidance:
       what: "How many app instances to run behind the ALB."
       how_to_get: "Start with 2 for HA; scale later."
+
+diagram:
+  nodes:
+    - { id: vpc, type: vpc, label: "VPC" }
+    - { id: pub, type: subnet, label: "Public subnet" }
+    - { id: priv, type: subnet, label: "Private subnet" }
+    - { id: sg, type: security_group, label: "Security groups" }
+    - { id: bastion, type: ec2_instance, label: "Bastion (public)" }
+    - { id: control, type: ec2_instance, label: "Ansible control (private)" }
+    - { id: app, type: ec2_instance, label: "App fleet (private)" }
+    - { id: alb, type: alb, label: "ALB (public)" }
+  edges:
+    - { from: vpc, to: pub, port: vpc }
+    - { from: vpc, to: priv, port: vpc }
+    - { from: vpc, to: sg, port: vpc }
+    - { from: pub, to: bastion, port: subnet }
+    - { from: sg, to: bastion, port: security_group }
+    - { from: priv, to: control, port: subnet }
+    - { from: sg, to: control, port: security_group }
+    - { from: priv, to: app, port: subnet }
+    - { from: sg, to: app, port: security_group }
+    - { from: pub, to: alb, port: subnets }
+    - { from: sg, to: alb, port: security_group }
+    - { from: bastion, to: control }
+    - { from: control, to: app }
+    - { from: alb, to: app }

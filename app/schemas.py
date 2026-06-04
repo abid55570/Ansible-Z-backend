@@ -21,6 +21,7 @@ class TemplateDetail(TemplateSummary):
     version: str
     roles: list[str] = []
     variables: dict = {}
+    diagram: dict | None = None
 
 
 class ProjectCreate(BaseModel):

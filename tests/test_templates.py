@@ -18,6 +18,13 @@ def test_template_detail(client):
     body = response.json()
     assert "project_name" in body["variables"]
     assert body["roles"]
+    # ready templates ship a single-view diagram
+    assert body["diagram"]["nodes"] and body["diagram"]["edges"]
+
+
+def test_stub_template_has_no_diagram(client):
+    body = client.get("/templates/k8s-platform").json()
+    assert body["diagram"] is None
 
 
 def test_template_detail_unknown(client):

@@ -45,3 +45,29 @@ variables:
     guidance:
       what: "Maximum number of app instances the ASG can scale to."
       how_to_get: "Set to your peak-load capacity."
+
+diagram:
+  nodes:
+    - { id: vpc, type: vpc, label: "VPC (2 AZs)" }
+    - { id: pubA, type: subnet, label: "Public A" }
+    - { id: pubB, type: subnet, label: "Public B" }
+    - { id: privA, type: subnet, label: "Private A" }
+    - { id: privB, type: subnet, label: "Private B" }
+    - { id: sg, type: security_group, label: "Security groups" }
+    - { id: alb, type: alb, label: "ALB (multi-AZ)" }
+    - { id: app, type: ec2_instance, label: "App ASG" }
+    - { id: db, type: rds, label: "RDS Multi-AZ" }
+  edges:
+    - { from: vpc, to: pubA, port: vpc }
+    - { from: vpc, to: pubB, port: vpc }
+    - { from: vpc, to: privA, port: vpc }
+    - { from: vpc, to: privB, port: vpc }
+    - { from: vpc, to: sg, port: vpc }
+    - { from: pubA, to: alb, port: subnets }
+    - { from: pubB, to: alb, port: subnets }
+    - { from: sg, to: alb, port: security_group }
+    - { from: privA, to: app, port: subnet }
+    - { from: sg, to: app, port: security_group }
+    - { from: privA, to: db, port: subnets }
+    - { from: privB, to: db, port: subnets }
+    - { from: alb, to: app }
