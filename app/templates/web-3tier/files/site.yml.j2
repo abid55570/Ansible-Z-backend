@@ -1,0 +1,17 @@
+{% raw %}---
+# Full-stack provisioning. Values come from group_vars/all.yml (auto-loaded).
+- name: Provision infrastructure
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - amazon.aws
+    - community.aws
+  roles:
+    - vpc
+    - security_groups
+    - bastion
+    - alb
+    - asg_app
+    - rds
+{% endraw %}

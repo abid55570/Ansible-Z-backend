@@ -1,0 +1,10 @@
+id: zero-trust
+name: "Zero-Trust Access"
+version: 0.1.0
+pci: core
+summary: "SSM, PrivateLink, mTLS and IdP + MFA — no bastion, deny by default."
+roles: [vpc, ssm_access, privatelink, iam_roles, mtls]
+variables:
+  project_name: { type: string, required: true }
+  aws_region: { type: string, required: true }
+  idp_domain: { type: string, required: false }

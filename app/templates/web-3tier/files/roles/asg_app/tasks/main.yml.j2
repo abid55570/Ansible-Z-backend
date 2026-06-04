@@ -1,0 +1,30 @@
+{% raw %}---
+- name: Create launch template for app tier
+  amazon.aws.ec2_launch_template:
+    name: "{{ project_name }}-app-lt"
+    region: "{{ aws_region }}"
+    instance_type: t3.micro
+    image_id: "{{ app_ami | default(omit) }}"
+    tags: "{{ common_tags }}"
+
+- name: Find private subnets
+  amazon.aws.ec2_vpc_subnet_info:
+    region: "{{ aws_region }}"
+    filters:
+      "tag:Role": private
+  register: priv
+
+- name: Create auto scaling group
+  amazon.aws.autoscaling_group:
+    name: "{{ project_name }}-app-asg"
+    region: "{{ aws_region }}"
+    launch_template:
+      launch_template_name: "{{ project_name }}-app-lt"
+    min_size: 2
+    max_size: 4
+    desired_capacity: 2
+    vpc_zone_identifier: "{{ priv.subnets | map(attribute='id') | list }}"
+    tags:
+      - Project: "{{ project_name }}"
+    state: present
+{% endraw %}

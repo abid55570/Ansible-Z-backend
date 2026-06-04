@@ -1,0 +1,34 @@
+{% raw %}---
+- name: Find public subnets
+  amazon.aws.ec2_vpc_subnet_info:
+    region: "{{ aws_region }}"
+    filters:
+      "tag:Role": public
+  register: pub
+
+- name: Create target group
+  community.aws.elb_target_group:
+    name: "{{ project_name }}-tg"
+    region: "{{ aws_region }}"
+    protocol: HTTP
+    port: 80
+    vpc_id: "{{ pub.subnets[0].vpc_id }}"
+    target_type: instance
+    health_check_path: /
+    state: present
+
+- name: Create application load balancer
+  amazon.aws.elb_application_lb:
+    name: "{{ project_name }}-alb"
+    region: "{{ aws_region }}"
+    subnets: "{{ pub.subnets | map(attribute='id') | list }}"
+    security_groups:
+      - "{{ project_name }}-alb-sg"
+    listeners:
+      - Protocol: HTTP
+        Port: 80
+        DefaultActions:
+          - Type: forward
+            TargetGroupName: "{{ project_name }}-tg"
+    state: present
+{% endraw %}

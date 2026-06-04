@@ -1,0 +1,11 @@
+id: pci-cde-enclave
+name: "PCI CDE Enclave"
+version: 0.1.0
+pci: core
+summary: "Isolated cardholder-data environment with vault, FIM, AV and centralized logging."
+roles: [vpc_isolated, nacl, vault_tokenize, fim, antivirus, logging, kms]
+variables:
+  project_name: { type: string, required: true }
+  aws_region: { type: string, required: true }
+  cde_cidr: { type: cidr, required: true, default: "10.50.0.0/24" }
+  office_ip: { type: cidr, required: true, scope: [uat, prod] }

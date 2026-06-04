@@ -1,0 +1,49 @@
+id: vietpay-bastion-alb
+name: "Bastion + Control + ALB"
+version: 0.1.0
+pci: capable
+summary: "Bastion to a private Ansible control host to an app fleet behind an ALB."
+roles: [vpc, bastion, control_host, app_instances, alb]
+
+variables:
+  project_name:
+    type: string
+    required: true
+    example: "vietpay"
+    guidance:
+      what: "Short slug used to name and tag all resources."
+      how_to_get: "Pick a lowercase name, e.g. 'vietpay'."
+
+  aws_region:
+    type: string
+    required: true
+    example: "ap-south-1"
+    guidance:
+      what: "AWS region to deploy into."
+      how_to_get: "Mumbai = ap-south-1, Singapore = ap-southeast-1."
+
+  vpc_cidr:
+    type: cidr
+    required: true
+    default: "10.20.0.0/16"
+    guidance:
+      what: "Top-level network range for the VPC."
+      how_to_get: "Use a /16 that does not overlap any peered network."
+
+  office_ip:
+    type: cidr
+    required: true
+    scope: [uat, prod]
+    example: "203.0.113.10/32"
+    guidance:
+      what: "The only public IP allowed to SSH the bastion."
+      how_to_get: "Run: curl https://checkip.amazonaws.com  then append /32"
+      uat_check: "ssh -i keys/bastion.pem ubuntu@<BASTION_IP> must connect only from this IP."
+
+  app_desired_count:
+    type: number
+    required: false
+    default: 2
+    guidance:
+      what: "How many app instances to run behind the ALB."
+      how_to_get: "Start with 2 for HA; scale later."

@@ -1,0 +1,10 @@
+id: serverless-eventdriven
+name: "Serverless Event-Driven"
+version: 0.1.0
+pci: scope-reducer
+summary: "API Gateway + Lambda + managed data, minimal audit surface."
+roles: [api_gateway, lambda, dynamodb, eventbridge, waf]
+variables:
+  project_name: { type: string, required: true }
+  aws_region: { type: string, required: true }
+  runtime: { type: string, required: false, default: "python3.12" }

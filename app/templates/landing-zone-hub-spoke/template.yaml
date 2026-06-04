@@ -1,0 +1,10 @@
+id: landing-zone-hub-spoke
+name: "Hub-and-Spoke Landing Zone"
+version: 0.1.0
+pci: capable
+summary: "Transit Gateway, multi-account, central egress and logging."
+roles: [transit_gateway, hub_vpc, spoke_vpc, central_egress, logging]
+variables:
+  org_name: { type: string, required: true }
+  hub_region: { type: string, required: true, example: "ap-south-1" }
+  spoke_count: { type: number, required: false, default: 3 }

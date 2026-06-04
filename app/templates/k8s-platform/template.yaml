@@ -1,0 +1,10 @@
+id: k8s-platform
+name: "Kubernetes Platform"
+version: 0.1.0
+pci: capable
+summary: "EKS private nodes, ingress + WAF, service mesh mTLS, network policies."
+roles: [vpc, eks_cluster, node_groups, ingress_waf, mesh, secrets]
+variables:
+  cluster_name: { type: string, required: true }
+  aws_region: { type: string, required: true }
+  node_count: { type: number, required: false, default: 3 }

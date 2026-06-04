@@ -1,0 +1,34 @@
+{% raw %}---
+- name: Look up VPC
+  amazon.aws.ec2_vpc_net_info:
+    region: "{{ aws_region }}"
+    filters:
+      "tag:Project": "{{ project_name }}"
+  register: vpc_info
+
+- name: ALB security group (public 80/443)
+  amazon.aws.ec2_security_group:
+    name: "{{ project_name }}-alb-sg"
+    description: "ALB public ingress"
+    vpc_id: "{{ vpc_info.vpcs[0].id }}"
+    region: "{{ aws_region }}"
+    rules:
+      - proto: tcp
+        ports: [80, 443]
+        cidr_ip: 0.0.0.0/0
+    tags: "{{ common_tags }}"
+    state: present
+
+- name: Bastion security group (SSH from office only)
+  amazon.aws.ec2_security_group:
+    name: "{{ project_name }}-bastion-sg"
+    description: "Bastion SSH"
+    vpc_id: "{{ vpc_info.vpcs[0].id }}"
+    region: "{{ aws_region }}"
+    rules:
+      - proto: tcp
+        ports: [22]
+        cidr_ip: "{{ office_ip }}"
+    tags: "{{ common_tags }}"
+    state: present
+{% endraw %}

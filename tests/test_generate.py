@@ -1,0 +1,81 @@
+from app.config import get_settings
+
+WEB3_CONFIG = {
+    "project_name": "vietpay-web",
+    "aws_region": "ap-south-1",
+    "vpc_cidr": "10.20.0.0/16",
+    "office_ip": "203.0.113.10/32",
+}
+
+
+def _make_project(auth_client, slug="web-3tier", config=None):
+    response = auth_client.post(
+        "/projects",
+        json={"name": "p", "template_slug": slug, "config": config or WEB3_CONFIG},
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
+def test_generate_and_download(auth_client, fake_storage):
+    project_id = _make_project(auth_client)
+
+    generated = auth_client.post(f"/projects/{project_id}/generate", json={"env": "uat"})
+    assert generated.status_code == 200, generated.text
+    assert generated.json()["lint_status"] == "passed"
+
+    downloaded = auth_client.get(f"/projects/{project_id}/download", params={"env": "uat"})
+    assert downloaded.status_code == 200
+    assert downloaded.content[:2] == b"PK"  # zip magic number
+
+
+def test_generate_template_not_ready(auth_client, fake_storage):
+    project_id = _make_project(
+        auth_client,
+        slug="k8s-platform",
+        config={"cluster_name": "c", "aws_region": "ap-south-1"},
+    )
+    assert auth_client.post(f"/projects/{project_id}/generate", json={"env": "uat"}).status_code == 409
+
+
+def test_generate_missing_required_var(auth_client, fake_storage):
+    project_id = _make_project(
+        auth_client,
+        config={"project_name": "x", "aws_region": "ap-south-1", "vpc_cidr": "10.0.0.0/16"},
+    )
+    # office_ip is required for uat -> 400
+    assert auth_client.post(f"/projects/{project_id}/generate", json={"env": "uat"}).status_code == 400
+
+
+def test_generate_lint_failure(auth_client, fake_storage, monkeypatch):
+    monkeypatch.setattr(
+        "app.services.linter.lint_files",
+        lambda files: {"status": "failed", "errors": [{"file": "x.yml", "error": "broken"}]},
+    )
+    project_id = _make_project(auth_client)
+    assert auth_client.post(f"/projects/{project_id}/generate", json={"env": "uat"}).status_code == 422
+
+
+def test_download_without_generation(auth_client):
+    project_id = _make_project(auth_client)
+    assert auth_client.get(f"/projects/{project_id}/download", params={"env": "uat"}).status_code == 404
+
+
+def test_generate_deep_lint_pass(auth_client, fake_storage, monkeypatch):
+    monkeypatch.setattr(get_settings(), "deep_lint", True)
+    monkeypatch.setattr(
+        "app.services.ansible_check.syntax_check",
+        lambda files, playbook="site.yml": {"status": "passed"},
+    )
+    project_id = _make_project(auth_client)
+    assert auth_client.post(f"/projects/{project_id}/generate", json={"env": "uat"}).status_code == 200
+
+
+def test_generate_deep_lint_failure(auth_client, fake_storage, monkeypatch):
+    monkeypatch.setattr(get_settings(), "deep_lint", True)
+    monkeypatch.setattr(
+        "app.services.ansible_check.syntax_check",
+        lambda files, playbook="site.yml": {"status": "failed", "output": "boom"},
+    )
+    project_id = _make_project(auth_client)
+    assert auth_client.post(f"/projects/{project_id}/generate", json={"env": "uat"}).status_code == 422

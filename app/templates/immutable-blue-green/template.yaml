@@ -1,0 +1,10 @@
+id: immutable-blue-green
+name: "Immutable Blue/Green"
+version: 0.1.0
+pci: capable
+summary: "Golden-AMI pipeline with zero-downtime blue/green deployments."
+roles: [vpc, golden_ami, asg_blue_green, alb, pipeline]
+variables:
+  project_name: { type: string, required: true }
+  aws_region: { type: string, required: true }
+  base_ami: { type: string, required: false }

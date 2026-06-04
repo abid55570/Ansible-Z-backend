@@ -1,0 +1,10 @@
+id: hybrid-onprem-cloud
+name: "Hybrid On-Prem to Cloud"
+version: 0.1.0
+pci: capable
+summary: "Direct Connect / VPN boundary between data center and cloud, with flow logs."
+roles: [vpc, vpn_gateway, dx_gateway, firewall, flow_logs]
+variables:
+  project_name: { type: string, required: true }
+  aws_region: { type: string, required: true }
+  onprem_cidr: { type: cidr, required: true, example: "192.168.0.0/16" }

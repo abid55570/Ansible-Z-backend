@@ -1,0 +1,10 @@
+id: dr-multi-region
+name: "Multi-Region DR"
+version: 0.1.0
+pci: none
+summary: "Primary region plus a warm standby region with Route 53 failover."
+roles: [vpc, app, rds_replica, route53_failover]
+variables:
+  project_name: { type: string, required: true }
+  primary_region: { type: string, required: true, example: "ap-south-1" }
+  dr_region: { type: string, required: true, example: "ap-southeast-1" }

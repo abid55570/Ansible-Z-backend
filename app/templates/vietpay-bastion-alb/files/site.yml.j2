@@ -1,0 +1,163 @@
+{% raw %}---
+# Bastion -> private control host -> app fleet behind an ALB.
+# Values come from group_vars/all.yml (auto-loaded).
+- name: Provision bastion + control + app fleet + ALB
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - amazon.aws
+    - community.aws
+  tasks:
+    - name: Create VPC
+      amazon.aws.ec2_vpc_net:
+        name: "{{ project_name }}-{{ environment_name }}-vpc"
+        cidr_block: "{{ vpc_cidr }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: vpc
+
+    - name: Create internet gateway
+      amazon.aws.ec2_vpc_igw:
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: Create public subnet
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ public_subnet_cidr }}"
+        region: "{{ aws_region }}"
+        map_public: true
+        tags: "{{ common_tags | combine({'Name': project_name + '-public', 'Role': 'public'}) }}"
+        state: present
+      register: public_subnet
+
+    - name: Create private subnet
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ private_subnet_cidr }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags | combine({'Name': project_name + '-private', 'Role': 'private'}) }}"
+        state: present
+      register: private_subnet
+
+    - name: Bastion security group (SSH from office only)
+      amazon.aws.ec2_security_group:
+        name: "{{ project_name }}-bastion-sg"
+        description: "Bastion SSH"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp
+            ports: [22]
+            cidr_ip: "{{ office_ip }}"
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: ALB security group (public 80/443)
+      amazon.aws.ec2_security_group:
+        name: "{{ project_name }}-alb-sg"
+        description: "ALB public ingress"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp
+            ports: [80, 443]
+            cidr_ip: 0.0.0.0/0
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: App security group (from ALB)
+      amazon.aws.ec2_security_group:
+        name: "{{ project_name }}-app-sg"
+        description: "App tier from ALB"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp
+            ports: [8080]
+            group_name: "{{ project_name }}-alb-sg"
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: Find latest Ubuntu 22.04 AMI
+      amazon.aws.ec2_ami_info:
+        region: "{{ aws_region }}"
+        owners: ["099720109477"]
+        filters:
+          name: "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"
+      register: ami
+
+    - name: Resolve latest AMI id
+      ansible.builtin.set_fact:
+        latest_ami: "{{ (ami.images | sort(attribute='creation_date') | last).image_id }}"
+
+    - name: Launch bastion (public)
+      amazon.aws.ec2_instance:
+        name: "{{ project_name }}-bastion"
+        region: "{{ aws_region }}"
+        instance_type: t3.micro
+        image_id: "{{ latest_ami }}"
+        vpc_subnet_id: "{{ public_subnet.subnet.id }}"
+        network:
+          assign_public_ip: true
+        security_group: "{{ project_name }}-bastion-sg"
+        tags: "{{ common_tags | combine({'Role': 'bastion'}) }}"
+        state: present
+
+    - name: Launch private Ansible control host
+      amazon.aws.ec2_instance:
+        name: "{{ project_name }}-control"
+        region: "{{ aws_region }}"
+        instance_type: t3.micro
+        image_id: "{{ latest_ami }}"
+        vpc_subnet_id: "{{ private_subnet.subnet.id }}"
+        network:
+          assign_public_ip: false
+        tags: "{{ common_tags | combine({'Role': 'control'}) }}"
+        state: present
+
+    - name: Launch app fleet (private)
+      amazon.aws.ec2_instance:
+        name: "{{ project_name }}-app-{{ item }}"
+        region: "{{ aws_region }}"
+        instance_type: t3.micro
+        image_id: "{{ latest_ami }}"
+        vpc_subnet_id: "{{ private_subnet.subnet.id }}"
+        network:
+          assign_public_ip: false
+        security_group: "{{ project_name }}-app-sg"
+        tags: "{{ common_tags | combine({'Role': 'app'}) }}"
+        state: present
+      loop: "{{ range(1, (app_desired_count | int) + 1) | list }}"
+
+    - name: Create target group
+      community.aws.elb_target_group:
+        name: "{{ project_name }}-tg"
+        region: "{{ aws_region }}"
+        protocol: HTTP
+        port: 8080
+        vpc_id: "{{ vpc.vpc.id }}"
+        target_type: instance
+        health_check_path: /
+        state: present
+
+    - name: Create application load balancer
+      amazon.aws.elb_application_lb:
+        name: "{{ project_name }}-alb"
+        region: "{{ aws_region }}"
+        subnets:
+          - "{{ public_subnet.subnet.id }}"
+        security_groups:
+          - "{{ project_name }}-alb-sg"
+        listeners:
+          - Protocol: HTTP
+            Port: 80
+            DefaultActions:
+              - Type: forward
+                TargetGroupName: "{{ project_name }}-tg"
+        state: present
+{% endraw %}
