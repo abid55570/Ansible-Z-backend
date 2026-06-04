@@ -12,7 +12,7 @@ SAMPLE_IR = {
         {"id": "vpc1", "type": "vpc", "props": {"cidr": "10.0.0.0/16"}},
         {"id": "pub1", "type": "subnet", "props": {"cidr": "10.0.1.0/24", "public": True, "az": "ap-south-1a"}, "inputs": {"vpc": "vpc1"}},
         {"id": "pub2", "type": "subnet", "props": {"cidr": "10.0.2.0/24", "public": True, "az": "ap-south-1b"}, "inputs": {"vpc": "vpc1"}},
-        {"id": "sg1", "type": "security_group", "props": {"ingress": [{"port": 80}]}, "inputs": {"vpc": "vpc1"}},
+        {"id": "sg1", "type": "security_group", "props": {"ssh_cidr": "203.0.113.10/32", "allow_http": True, "allow_https": True}, "inputs": {"vpc": "vpc1"}},
         {"id": "web", "type": "ec2_instance", "props": {"instance_type": "t3.micro"}, "inputs": {"subnet": "pub1", "security_group": "sg1"}},
         {"id": "alb1", "type": "alb", "props": {}, "inputs": {"subnets": ["pub1", "pub2"], "security_group": "sg1"}},
         {"id": "db1", "type": "rds", "props": {}, "inputs": {"subnets": ["pub1", "pub2"]}},

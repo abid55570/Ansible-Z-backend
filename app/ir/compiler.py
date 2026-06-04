@@ -41,9 +41,9 @@ def validate(ir: dict) -> None:
             continue
         spec = BLOCKS[ntype]
         props = node.get("props", {})
-        for req in spec["required"]:
-            if req not in props:
-                errors.append(f"{nid}: missing required prop '{req}'")
+        for prop_name, prop_spec in spec.get("props", {}).items():
+            if prop_spec.get("required") and prop_name not in props:
+                errors.append(f"{nid}: missing required prop '{prop_name}'")
         inputs = node.get("inputs", {})
         for port, pspec in spec["inputs"].items():
             if port not in inputs:

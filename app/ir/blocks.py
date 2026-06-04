@@ -42,15 +42,19 @@ def _subnet(node, refs, ctx):
 
 
 def _security_group(node, refs, ctx):
-    rules = [
-        {"proto": "tcp", "ports": [r["port"]], "cidr_ip": r.get("cidr", "0.0.0.0/0")}
-        for r in node["props"].get("ingress", [])
-    ]
+    props = node["props"]
+    rules = []
+    if props.get("ssh_cidr"):
+        rules.append({"proto": "tcp", "ports": [22], "cidr_ip": props["ssh_cidr"]})
+    if props.get("allow_http"):
+        rules.append({"proto": "tcp", "ports": [80], "cidr_ip": "0.0.0.0/0"})
+    if props.get("allow_https"):
+        rules.append({"proto": "tcp", "ports": [443], "cidr_ip": "0.0.0.0/0"})
     return {
         "name": f"Security group: {node['id']}",
         "amazon.aws.ec2_security_group": {
-            "name": node["props"].get("name", node["id"]),
-            "description": node["props"].get("description", node["id"]),
+            "name": props.get("name", node["id"]),
+            "description": props.get("description", node["id"]),
             "vpc_id": refs["vpc"],
             "region": ctx["region"],
             "rules": rules,
@@ -131,16 +135,33 @@ def _rds(node, refs, ctx):
 
 
 BLOCKS: dict[str, dict] = {
-    "vpc": {"inputs": {}, "required": ["cidr"], "output": "vpc.id", "render": _vpc},
+    "vpc": {
+        "inputs": {},
+        "props": {
+            "cidr": {"type": "cidr", "required": True, "default": "10.0.0.0/16", "guidance": "Network range for the VPC."},
+            "name": {"type": "string", "guidance": "Optional Name tag."},
+        },
+        "output": "vpc.id",
+        "render": _vpc,
+    },
     "subnet": {
         "inputs": {"vpc": {"type": "vpc", "many": False}},
-        "required": ["cidr"],
+        "props": {
+            "cidr": {"type": "cidr", "required": True, "example": "10.0.1.0/24", "guidance": "Subnet range within the VPC CIDR."},
+            "az": {"type": "string", "example": "ap-south-1a", "guidance": "Availability zone."},
+            "public": {"type": "bool", "default": False, "guidance": "Auto-assign public IPs?"},
+        },
         "output": "subnet.id",
         "render": _subnet,
     },
     "security_group": {
         "inputs": {"vpc": {"type": "vpc", "many": False}},
-        "required": [],
+        "props": {
+            "name": {"type": "string", "guidance": "Optional name."},
+            "ssh_cidr": {"type": "cidr", "example": "203.0.113.10/32", "guidance": "Allow SSH (22) from this IP. Avoid 0.0.0.0/0."},
+            "allow_http": {"type": "bool", "default": False, "guidance": "Allow HTTP (80) from anywhere."},
+            "allow_https": {"type": "bool", "default": False, "guidance": "Allow HTTPS (443) from anywhere."},
+        },
         "output": "group_id",
         "render": _security_group,
     },
@@ -149,7 +170,12 @@ BLOCKS: dict[str, dict] = {
             "subnet": {"type": "subnet", "many": False},
             "security_group": {"type": "security_group", "many": False},
         },
-        "required": [],
+        "props": {
+            "name": {"type": "string"},
+            "instance_type": {"type": "string", "default": "t3.micro", "guidance": "EC2 instance size."},
+            "ami": {"type": "string", "guidance": "AMI id (defaults to a group_var placeholder)."},
+            "public": {"type": "bool", "default": False, "guidance": "Assign a public IP?"},
+        },
         "output": "instance_ids",
         "render": _ec2_instance,
     },
@@ -158,13 +184,21 @@ BLOCKS: dict[str, dict] = {
             "subnets": {"type": "subnet", "many": True},
             "security_group": {"type": "security_group", "many": False},
         },
-        "required": [],
+        "props": {
+            "name": {"type": "string"},
+            "target_group": {"type": "string", "guidance": "Target group name (defaults to <id>-tg)."},
+        },
         "output": "dns_name",
         "render": _alb,
     },
     "rds": {
         "inputs": {"subnets": {"type": "subnet", "many": True}},
-        "required": [],
+        "props": {
+            "engine": {"type": "string", "default": "postgres", "guidance": "Database engine."},
+            "instance_class": {"type": "string", "default": "db.t3.micro"},
+            "storage": {"type": "number", "default": 20, "guidance": "Allocated storage (GB)."},
+            "username": {"type": "string", "default": "appadmin"},
+        },
         "output": "endpoint",
         "render": _rds,
     },

@@ -12,7 +12,7 @@ router = APIRouter(prefix="/designs", tags=["designs"])
 def list_blocks() -> dict:
     """Catalogue of building blocks for the canvas palette (ports + schema)."""
     return {
-        name: {"inputs": spec["inputs"], "required": spec["required"], "output": spec["output"]}
+        name: {"inputs": spec["inputs"], "props": spec["props"], "output": spec["output"]}
         for name, spec in BLOCKS.items()
     }
 
