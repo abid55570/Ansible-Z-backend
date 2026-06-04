@@ -2,6 +2,7 @@ id: simple-static-site
 name: "Simple Static Site (starter)"
 version: 0.1.0
 pci: none
+tier: starter
 summary: "An S3 bucket configured for public static website hosting — host a site with no servers."
 roles: [s3_bucket, s3_website]
 

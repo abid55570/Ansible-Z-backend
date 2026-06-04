@@ -13,6 +13,7 @@ class TemplateSummary(BaseModel):
     slug: str
     name: str
     pci: str
+    tier: str = "enterprise"
     summary: str
     ready: bool
 

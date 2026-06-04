@@ -86,6 +86,7 @@ def _summary(manifest: dict) -> dict:
         "slug": manifest["id"],
         "name": manifest.get("name", manifest["id"]),
         "pci": manifest.get("pci", "none"),
+        "tier": manifest.get("tier", "enterprise"),
         "summary": manifest.get("summary", ""),
         "ready": template_is_ready(manifest["id"]),
     }

@@ -8,8 +8,13 @@ def test_list_templates(client):
 
     web = next(t for t in data if t["slug"] == "web-3tier")
     assert web["ready"] is True
-    # all 11 templates are now generatable
+    # all templates are now generatable
     assert all(t["ready"] for t in data)
+
+    # starter-tier templates are flagged; enterprise is the default
+    tier = {t["slug"]: t["tier"] for t in data}
+    assert tier["single-vm-app"] == "starter"
+    assert tier["web-3tier"] == "enterprise"
 
 
 def test_template_detail(client):

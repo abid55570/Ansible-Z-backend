@@ -2,6 +2,7 @@ id: basic-secure-vpc
 name: "Basic Secure VPC (starter)"
 version: 0.1.0
 pci: capable
+tier: starter
 summary: "A secure network foundation: public + private subnets, IGW, NAT egress, and a locked-down base SG."
 roles: [vpc, subnets, igw, nat_gateway, security_group]
 

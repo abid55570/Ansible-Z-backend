@@ -2,6 +2,7 @@ id: single-vm-app
 name: "Single VM App (starter)"
 version: 0.1.0
 pci: none
+tier: starter
 summary: "One Docker-ready EC2 instance in a public subnet — provision, then ship apps with the Day-2 layer."
 roles: [vpc, security_group, ec2_instance]
 
