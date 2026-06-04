@@ -273,6 +273,109 @@ def _iam_role(node, refs, ctx):
     }
 
 
+def _eks_cluster(node, refs, ctx):
+    return {
+        "name": f"EKS cluster: {node['id']}",
+        "community.aws.eks_cluster": {
+            "name": node["props"].get("name", node["id"]),
+            "region": ctx["region"],
+            "role_arn": node["props"].get("role_arn", "arn:aws:iam::000000000000:role/eks-cluster"),
+            "subnets": refs["subnets"],
+            "state": "present",
+        },
+    }
+
+
+def _eks_nodegroup(node, refs, ctx):
+    return {
+        "name": f"EKS node group: {node['id']}",
+        "community.aws.eks_nodegroup": {
+            "name": node["props"].get("name", node["id"]),
+            "cluster_name": node["props"].get("cluster_name", "cluster"),
+            "region": ctx["region"],
+            "node_role": node["props"].get("node_role_arn", "arn:aws:iam::000000000000:role/eks-node"),
+            "subnets": refs["subnets"],
+            "state": "present",
+        },
+    }
+
+
+def _transit_gateway(node, refs, ctx):
+    return {
+        "name": f"Transit gateway: {node['id']}",
+        "community.aws.ec2_transit_gateway": {
+            "description": node["props"].get("description", node["id"]),
+            "region": ctx["region"],
+            "tags": TAGS,
+            "state": "present",
+        },
+    }
+
+
+def _vpn_gateway(node, refs, ctx):
+    return {
+        "name": f"VPN gateway: {node['id']}",
+        "amazon.aws.ec2_vpc_vgw": {
+            "name": node["props"].get("name", node["id"]),
+            "vpc_id": refs["vpc"],
+            "region": ctx["region"],
+            "type": "ipsec.1",
+            "tags": TAGS,
+            "state": "present",
+        },
+    }
+
+
+def _cloudtrail(node, refs, ctx):
+    return {
+        "name": f"CloudTrail: {node['id']}",
+        "amazon.aws.cloudtrail": {
+            "name": node["props"].get("name", node["id"]),
+            "region": ctx["region"],
+            "s3_bucket_name": node["props"].get("bucket_name", "audit-logs"),
+            "is_multi_region_trail": True,
+            "state": "present",
+        },
+    }
+
+
+def _api_gateway(node, refs, ctx):
+    return {
+        "name": f"API gateway: {node['id']}",
+        "community.aws.api_gateway": {
+            "region": ctx["region"],
+            "swagger_text": node["props"].get("swagger_text", "{}"),
+            "stage": node["props"].get("stage", "prod"),
+            "state": "present",
+        },
+    }
+
+
+def _eventbridge(node, refs, ctx):
+    return {
+        "name": f"EventBridge rule: {node['id']}",
+        "amazon.aws.cloudwatchevent_rule": {
+            "name": node["props"].get("name", node["id"]),
+            "region": ctx["region"],
+            "schedule_expression": node["props"].get("schedule", "rate(5 minutes)"),
+            "state": "present",
+        },
+    }
+
+
+def _vpc_endpoint(node, refs, ctx):
+    return {
+        "name": f"VPC endpoint: {node['id']}",
+        "amazon.aws.ec2_vpc_endpoint": {
+            "vpc_id": refs["vpc"],
+            "region": ctx["region"],
+            "service": node["props"].get("service", "com.amazonaws." + ctx["region"] + ".ssm"),
+            "vpc_endpoint_type": node["props"].get("endpoint_type", "Interface"),
+            "state": "present",
+        },
+    }
+
+
 BLOCKS: dict[str, dict] = {
     "vpc": {
         "inputs": {},
@@ -427,5 +530,72 @@ BLOCKS: dict[str, dict] = {
         },
         "output": "arn",
         "render": _iam_role,
+    },
+    "eks_cluster": {
+        "inputs": {"subnets": {"type": "subnet", "many": True}},
+        "props": {
+            "name": {"type": "string"},
+            "role_arn": {"type": "string", "guidance": "EKS cluster IAM role ARN."},
+        },
+        "output": "name",
+        "render": _eks_cluster,
+    },
+    "eks_nodegroup": {
+        "inputs": {"subnets": {"type": "subnet", "many": True}},
+        "props": {
+            "name": {"type": "string"},
+            "cluster_name": {"type": "string", "guidance": "Name of the EKS cluster."},
+            "node_role_arn": {"type": "string", "guidance": "Node IAM role ARN."},
+        },
+        "output": "nodegroup.nodegroup_name",
+        "render": _eks_nodegroup,
+    },
+    "transit_gateway": {
+        "inputs": {},
+        "props": {"description": {"type": "string"}},
+        "output": "transit_gateway.transit_gateway_id",
+        "render": _transit_gateway,
+    },
+    "vpn_gateway": {
+        "inputs": {"vpc": {"type": "vpc", "many": False}},
+        "props": {"name": {"type": "string"}},
+        "output": "vgw.id",
+        "render": _vpn_gateway,
+    },
+    "cloudtrail": {
+        "inputs": {},
+        "props": {
+            "name": {"type": "string"},
+            "bucket_name": {"type": "string", "guidance": "S3 bucket for the trail."},
+        },
+        "output": "trail.name",
+        "render": _cloudtrail,
+    },
+    "api_gateway": {
+        "inputs": {},
+        "props": {
+            "stage": {"type": "string", "default": "prod"},
+            "swagger_text": {"type": "string", "guidance": "OpenAPI/Swagger definition (JSON)."},
+        },
+        "output": "api_id",
+        "render": _api_gateway,
+    },
+    "eventbridge": {
+        "inputs": {},
+        "props": {
+            "name": {"type": "string"},
+            "schedule": {"type": "string", "default": "rate(5 minutes)"},
+        },
+        "output": "name",
+        "render": _eventbridge,
+    },
+    "vpc_endpoint": {
+        "inputs": {"vpc": {"type": "vpc", "many": False}},
+        "props": {
+            "service": {"type": "string", "guidance": "e.g. com.amazonaws.<region>.ssm"},
+            "endpoint_type": {"type": "string", "default": "Interface"},
+        },
+        "output": "endpoint.vpc_endpoint_id",
+        "render": _vpc_endpoint,
     },
 }

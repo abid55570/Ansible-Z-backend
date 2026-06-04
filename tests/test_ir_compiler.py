@@ -105,6 +105,14 @@ ALL_BLOCKS_IR = {
         {"id": "ddb", "type": "dynamodb", "props": {}},
         {"id": "key", "type": "kms_key", "props": {}},
         {"id": "role", "type": "iam_role", "props": {}},
+        {"id": "eks", "type": "eks_cluster", "props": {}, "inputs": {"subnets": ["pub"]}},
+        {"id": "ng", "type": "eks_nodegroup", "props": {}, "inputs": {"subnets": ["pub"]}},
+        {"id": "tgw", "type": "transit_gateway", "props": {}},
+        {"id": "vgw", "type": "vpn_gateway", "props": {}, "inputs": {"vpc": "vpc"}},
+        {"id": "trail", "type": "cloudtrail", "props": {}},
+        {"id": "api", "type": "api_gateway", "props": {}},
+        {"id": "events", "type": "eventbridge", "props": {}},
+        {"id": "ep", "type": "vpc_endpoint", "props": {}, "inputs": {"vpc": "vpc"}},
     ],
 }
 
@@ -115,5 +123,7 @@ def test_all_blocks_compile_to_valid_yaml():
     assert report["status"] == "passed", report["errors"]
     site = files["site.yml"]
     for marker in ("Internet gateway", "NAT gateway", "Route table", "S3 bucket", "Target group",
-                   "Launch template", "Lambda function", "DynamoDB table", "KMS key", "IAM role"):
+                   "Launch template", "Lambda function", "DynamoDB table", "KMS key", "IAM role",
+                   "EKS cluster", "EKS node group", "Transit gateway", "VPN gateway", "CloudTrail",
+                   "API gateway", "EventBridge rule", "VPC endpoint"):
         assert marker in site
