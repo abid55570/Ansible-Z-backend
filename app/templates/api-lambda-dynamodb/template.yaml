@@ -1,0 +1,51 @@
+id: api-lambda-dynamodb
+name: "Serverless REST API"
+version: 0.1.0
+pci: scope-reducer
+tier: enterprise
+summary: "API Gateway → Lambda → DynamoDB — a fully serverless REST API with no servers to manage."
+roles: [api_gateway, lambda, dynamodb, iam]
+
+variables:
+  project_name:
+    type: string
+    required: true
+    example: "todo-api"
+    guidance:
+      what: "Short slug used to name and tag all resources."
+      how_to_get: "Pick a lowercase name, e.g. 'todo-api'."
+
+  aws_region:
+    type: string
+    required: true
+    example: "ap-south-1"
+    guidance:
+      what: "AWS region to deploy into."
+      how_to_get: "Mumbai = ap-south-1, Singapore = ap-southeast-1."
+
+  lambda_runtime:
+    type: string
+    required: false
+    default: "python3.12"
+    guidance:
+      what: "Lambda runtime for the API handler."
+      how_to_get: "e.g. python3.12, nodejs20.x."
+
+  lambda_handler:
+    type: string
+    required: false
+    default: "app.handler"
+    guidance:
+      what: "Entrypoint the API invokes."
+      how_to_get: "<file>.<function>, e.g. app.handler."
+
+diagram:
+  nodes:
+    - { id: api, type: api_gateway, label: "API Gateway" }
+    - { id: role, type: iam_role, label: "Lambda role" }
+    - { id: fn, type: lambda, label: "API Lambda" }
+    - { id: table, type: dynamodb, label: "DynamoDB table" }
+  edges:
+    - { from: api, to: fn }
+    - { from: role, to: fn }
+    - { from: fn, to: table }

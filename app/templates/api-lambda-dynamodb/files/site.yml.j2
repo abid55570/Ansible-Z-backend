@@ -1,0 +1,50 @@
+{% raw %}---
+# Fully serverless REST API: API Gateway -> Lambda -> DynamoDB.
+# Values come from group_vars/all.yml (auto-loaded).
+- name: Provision serverless REST API
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - amazon.aws
+    - community.aws
+  tasks:
+    - name: DynamoDB table (on-demand)
+      community.aws.dynamodb_table:
+        name: "{{ project_name }}-table"
+        region: "{{ aws_region }}"
+        hash_key_name: id
+        hash_key_type: STRING
+        billing_mode: PAY_PER_REQUEST
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: Lambda execution role
+      amazon.aws.iam_role:
+        name: "{{ project_name }}-api-role"
+        assume_role_policy_document: '{ "Version": "2012-10-17", "Statement": [{ "Effect": "Allow", "Principal": {"Service": "lambda.amazonaws.com"}, "Action": "sts:AssumeRole" }] }'
+        managed_policies:
+          - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          - "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"
+        state: present
+      register: api_role
+
+    - name: API Lambda
+      amazon.aws.lambda:
+        name: "{{ project_name }}-api"
+        region: "{{ aws_region }}"
+        runtime: "{{ lambda_runtime }}"
+        handler: "{{ lambda_handler }}"
+        role: "{{ api_role.arn }}"
+        zip_file: "{{ lambda_zip }}"
+        environment_variables:
+          TABLE_NAME: "{{ project_name }}-table"
+        state: present
+
+    - name: REST API gateway (from your OpenAPI spec)
+      community.aws.api_gateway:
+        region: "{{ aws_region }}"
+        swagger_text: "{{ api_swagger }}"
+        stage: "{{ api_stage }}"
+        state: present
+{% endraw %}

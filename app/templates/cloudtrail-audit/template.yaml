@@ -1,0 +1,51 @@
+id: cloudtrail-audit
+name: "CloudTrail Audit Logging"
+version: 0.1.0
+pci: core
+tier: enterprise
+summary: "A tamper-evident audit trail: CloudTrail to a KMS-encrypted S3 bucket and CloudWatch Logs."
+roles: [kms, s3_logs, cloudwatch_logs, cloudtrail]
+
+variables:
+  project_name:
+    type: string
+    required: true
+    example: "acme"
+    guidance:
+      what: "Short slug used to name and tag all resources."
+      how_to_get: "Pick a lowercase name, e.g. 'acme'."
+
+  aws_region:
+    type: string
+    required: true
+    example: "ap-south-1"
+    guidance:
+      what: "Home region for the trail (it is multi-region)."
+      how_to_get: "Mumbai = ap-south-1, Singapore = ap-southeast-1."
+
+  log_bucket:
+    type: string
+    required: true
+    example: "acme-audit-logs-12345"
+    guidance:
+      what: "Globally-unique S3 bucket that stores the audit logs."
+      how_to_get: "Must be globally unique, lowercase; add a random suffix."
+
+  retention_days:
+    type: number
+    required: false
+    default: 90
+    guidance:
+      what: "How long CloudWatch keeps the log group."
+      how_to_get: "e.g. 90; raise for compliance retention."
+
+diagram:
+  nodes:
+    - { id: kms, type: kms_key, label: "KMS key" }
+    - { id: bucket, type: s3_bucket, label: "Audit log bucket" }
+    - { id: logs, type: cloudwatch, label: "CloudWatch Logs" }
+    - { id: trail, type: cloudtrail, label: "CloudTrail (multi-region)" }
+  edges:
+    - { from: kms, to: bucket }
+    - { from: bucket, to: trail }
+    - { from: trail, to: logs }

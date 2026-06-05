@@ -1,0 +1,189 @@
+{% raw %}---
+# Auto-scaling web tier behind an ALB, fronted by a WAFv2 web ACL.
+# Values come from group_vars/all.yml (auto-loaded).
+- name: Provision WAF-protected web tier
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - amazon.aws
+    - community.aws
+  tasks:
+    - name: Create VPC
+      amazon.aws.ec2_vpc_net:
+        name: "{{ project_name }}-{{ environment_name }}-vpc"
+        cidr_block: "{{ vpc_cidr }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: vpc
+
+    - name: Internet gateway
+      amazon.aws.ec2_vpc_igw:
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: igw
+
+    - name: Public subnet A
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ subnet_a_cidr }}"
+        az: "{{ az_a }}"
+        region: "{{ aws_region }}"
+        map_public: true
+        tags: "{{ common_tags | combine({'Name': project_name + '-public-a'}) }}"
+        state: present
+      register: pub_a
+
+    - name: Public subnet B
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ subnet_b_cidr }}"
+        az: "{{ az_b }}"
+        region: "{{ aws_region }}"
+        map_public: true
+        tags: "{{ common_tags | combine({'Name': project_name + '-public-b'}) }}"
+        state: present
+      register: pub_b
+
+    - name: Public route table
+      amazon.aws.ec2_vpc_route_table:
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        subnets:
+          - "{{ pub_a.subnet.id }}"
+          - "{{ pub_b.subnet.id }}"
+        routes:
+          - dest: 0.0.0.0/0
+            gateway_id: "{{ igw.gateway_id }}"
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: ALB security group
+      amazon.aws.ec2_security_group:
+        name: "{{ project_name }}-alb-sg"
+        description: "Public ALB"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - { proto: tcp, ports: [80, 443], cidr_ip: 0.0.0.0/0 }
+        tags: "{{ common_tags }}"
+        state: present
+      register: alb_sg
+
+    - name: App security group (from ALB only)
+      amazon.aws.ec2_security_group:
+        name: "{{ project_name }}-app-sg"
+        description: "Web instances from the ALB"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - { proto: tcp, ports: [80], group_id: "{{ alb_sg.group_id }}" }
+        tags: "{{ common_tags }}"
+        state: present
+      register: app_sg
+
+    - name: Find latest Ubuntu 22.04 AMI
+      amazon.aws.ec2_ami_info:
+        region: "{{ aws_region }}"
+        owners: ["099720109477"]
+        filters:
+          name: "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"
+      register: ami
+
+    - name: Resolve latest AMI id
+      ansible.builtin.set_fact:
+        latest_ami: "{{ (ami.images | sort(attribute='creation_date') | last).image_id }}"
+
+    - name: Launch template
+      amazon.aws.ec2_launch_template:
+        name: "{{ project_name }}-lt"
+        region: "{{ aws_region }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ latest_ami }}"
+        security_group_ids:
+          - "{{ app_sg.group_id }}"
+        tags: "{{ common_tags }}"
+
+    - name: Target group
+      community.aws.elb_target_group:
+        name: "{{ project_name }}-tg"
+        region: "{{ aws_region }}"
+        protocol: HTTP
+        port: 80
+        vpc_id: "{{ vpc.vpc.id }}"
+        target_type: instance
+        health_check_path: /
+        state: present
+      register: tg
+
+    - name: Application load balancer
+      amazon.aws.elb_application_lb:
+        name: "{{ project_name }}-alb"
+        region: "{{ aws_region }}"
+        subnets:
+          - "{{ pub_a.subnet.id }}"
+          - "{{ pub_b.subnet.id }}"
+        security_groups:
+          - "{{ alb_sg.group_id }}"
+        listeners:
+          - Protocol: HTTP
+            Port: 80
+            DefaultActions:
+              - Type: forward
+                TargetGroupName: "{{ project_name }}-tg"
+        state: present
+      register: alb
+
+    - name: Auto scaling group across AZs
+      amazon.aws.autoscaling_group:
+        name: "{{ project_name }}-asg"
+        region: "{{ aws_region }}"
+        launch_template:
+          launch_template_name: "{{ project_name }}-lt"
+        min_size: 2
+        max_size: 6
+        desired_capacity: 2
+        vpc_zone_identifier:
+          - "{{ pub_a.subnet.id }}"
+          - "{{ pub_b.subnet.id }}"
+        target_group_arns:
+          - "{{ tg.target_group_arn | default(omit) }}"
+        tags:
+          - Project: "{{ project_name }}"
+        state: present
+
+    - name: WAFv2 web ACL (AWS managed common rules)
+      community.aws.wafv2_web_acl:
+        name: "{{ project_name }}-waf"
+        scope: REGIONAL
+        region: "{{ aws_region }}"
+        default_action: allow
+        rules:
+          - name: AWSCommonRules
+            priority: 1
+            override_action: none
+            statement:
+              managed_rule_group_statement:
+                vendor_name: AWS
+                name: AWSManagedRulesCommonRuleSet
+            visibility_config:
+              sampled_requests_enabled: true
+              cloudwatch_metrics_enabled: true
+              metric_name: common
+        visibility_config:
+          sampled_requests_enabled: true
+          cloudwatch_metrics_enabled: true
+          metric_name: "{{ project_name }}-waf"
+        state: present
+
+    - name: Associate the WAF with the ALB
+      community.aws.wafv2_resources:
+        name: "{{ project_name }}-waf"
+        scope: REGIONAL
+        region: "{{ aws_region }}"
+        arn: "{{ alb.load_balancer.load_balancer_arn | default(alb.load_balancer_arn | default('')) }}"
+        state: present
+{% endraw %}

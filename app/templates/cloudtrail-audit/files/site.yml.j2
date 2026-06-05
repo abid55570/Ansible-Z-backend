@@ -1,0 +1,51 @@
+{% raw %}---
+# Tamper-evident audit trail: CloudTrail -> KMS-encrypted S3 + CloudWatch Logs.
+# Values come from group_vars/all.yml (auto-loaded).
+- name: Provision CloudTrail audit logging
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - amazon.aws
+    - community.aws
+  tasks:
+    - name: KMS key for log encryption
+      amazon.aws.kms_key:
+        alias: "{{ project_name }}-audit"
+        region: "{{ aws_region }}"
+        description: "Encrypts {{ project_name }} audit logs"
+        tags: "{{ common_tags }}"
+        state: present
+      register: audit_key
+
+    - name: Audit log bucket (encrypted, versioned, private)
+      amazon.aws.s3_bucket:
+        name: "{{ log_bucket }}"
+        region: "{{ aws_region }}"
+        versioning: true
+        encryption: "aws:kms"
+        public_access:
+          block_public_acls: true
+          block_public_policy: true
+          ignore_public_acls: true
+          restrict_public_buckets: true
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: CloudWatch log group
+      amazon.aws.cloudwatchlogs_log_group:
+        log_group_name: "/{{ project_name }}/audit"
+        region: "{{ aws_region }}"
+        retention: "{{ retention_days }}"
+        state: present
+
+    - name: CloudTrail (multi-region, log-file validation on)
+      amazon.aws.cloudtrail:
+        name: "{{ project_name }}-trail"
+        region: "{{ aws_region }}"
+        s3_bucket_name: "{{ log_bucket }}"
+        is_multi_region_trail: true
+        enable_log_file_validation: true
+        kms_key_id: "{{ audit_key.key_id }}"
+        state: present
+{% endraw %}
