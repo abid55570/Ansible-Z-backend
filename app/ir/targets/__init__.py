@@ -5,6 +5,7 @@ CloudFormation, Pulumi, CDK, Bicep, Kubernetes and Compose register here too.
 """
 
 from app.ir.compiler import compile_ir
+from app.ir.targets.azure import compile_bicep
 from app.ir.targets.cdk import compile_cdk
 from app.ir.targets.cloudformation import compile_cloudformation
 from app.ir.targets.compose import compile_compose
@@ -59,6 +60,12 @@ TARGETS: dict = {
         "coverage": "containers",
         "description": "Kubernetes manifests for the container workloads (Deployments + Services).",
         "compile": compile_kubernetes,
+    },
+    "bicep": {
+        "label": "Azure Bicep",
+        "coverage": "partial",
+        "description": "Azure Bicep template — best-effort AWS→Azure translation of core resources.",
+        "compile": compile_bicep,
     },
 }
 
