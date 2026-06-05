@@ -28,7 +28,11 @@ if not shutil.which("dot"):
             os.environ["PATH"] = _p + os.pathsep + os.environ["PATH"]
             break
 
-from diagrams import Cluster, Diagram, Edge  # noqa: E402
+from diagrams import Cluster, Diagram, Edge, Node  # noqa: E402
+
+# Shrink the icons globally (library default is 1.9in — far too large) for a
+# sober, compact look. Height leaves room for the label below the icon.
+Node._height = 1.5
 
 from app.services.generator import TEMPLATES_DIR, list_templates, load_manifest  # noqa: E402
 
@@ -146,9 +150,21 @@ def _render(slug: str, manifest: dict) -> bool:
             container[nid] = container[chosen]
 
     out = TEMPLATES_DIR / slug / "diagram"
-    graph_attr = {"fontsize": "22", "bgcolor": "white", "pad": "0.6", "splines": "ortho",
-                  "nodesep": "0.7", "ranksep": "1.1", "fontname": "Sans-Serif"}
-    node_attr = {"fontsize": "13", "fontname": "Sans-Serif"}
+    graph_attr = {
+        "fontsize": "15", "fontname": "Sans-Serif", "fontcolor": "#1e293b",
+        "bgcolor": "white", "pad": "0.5", "splines": "ortho",
+        "nodesep": "0.4", "ranksep": "0.7", "dpi": "140",
+    }
+    # Narrow, fixed-size nodes -> the icon scales down to ~0.9in and the label
+    # sits cleanly below it (Node._height gives the vertical room).
+    node_attr = {
+        "fontsize": "11", "fontname": "Sans-Serif", "fontcolor": "#475569",
+        "fixedsize": "true", "width": "0.9", "imagescale": "true", "labelloc": "b", "imagepos": "tc",
+    }
+    vpc_attr = {"bgcolor": "#eef5fc", "pencolor": "#b9d0e8", "style": "rounded", "penwidth": "1.3",
+                "fontsize": "12", "fontcolor": "#496f9c", "fontname": "Sans-Serif", "margin": "14"}
+    subnet_attr = {"bgcolor": "#f3f8f3", "pencolor": "#c8dcc8", "style": "rounded", "penwidth": "1.1",
+                   "fontsize": "11", "fontcolor": "#6a896a", "fontname": "Sans-Serif", "margin": "10"}
 
     with Diagram(manifest.get("name", slug), filename=str(out), outformat="png", show=False,
                  direction="LR", graph_attr=graph_attr, node_attr=node_attr):
@@ -158,14 +174,14 @@ def _render(slug: str, manifest: dict) -> bool:
             objs[nid] = _cls(types[nid])(label[nid])
 
         for vpc in vpc_ids:
-            with Cluster(label[vpc]):
+            with Cluster(label[vpc], graph_attr=vpc_attr):
                 for nid in [n["id"] for n in nodes if container.get(n["id"]) == vpc]:
                     make(nid)
                 for sub in [s for s in subnet_ids if vpc_of_subnet.get(s) == vpc]:
                     members = [n["id"] for n in nodes if container.get(n["id"]) == sub]
                     if not members:
                         continue  # skip empty subnet zones (keeps the picture clean)
-                    with Cluster(label[sub]):
+                    with Cluster(label[sub], graph_attr=subnet_attr):
                         for nid in members:
                             make(nid)
 
@@ -179,7 +195,7 @@ def _render(slug: str, manifest: dict) -> bool:
                 continue
             a, b = objs.get(e["from"]), objs.get(e["to"])
             if a is not None and b is not None:
-                a >> Edge(color="#4b5563") >> b
+                a >> Edge(color="#94a3b8", penwidth="1.1") >> b
 
     return True
 
