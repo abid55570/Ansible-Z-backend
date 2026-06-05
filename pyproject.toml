@@ -1,7 +1,7 @@
 [project]
-name = "ansible-z-backend"
+name = "neviri-ansi-backend"
 version = "0.1.0"
-description = "Ansible-Z API + project generator"
+description = "Neviri-Ansi API + project generator"
 requires-python = ">=3.11"
 
 [tool.pytest.ini_options]

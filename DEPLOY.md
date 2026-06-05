@@ -1,4 +1,4 @@
-# Deploying the Ansible-Z backend
+# Deploying the Neviri-Ansi backend
 
 ## What it needs
 - **PostgreSQL** — connection string in `DATABASE_URL`.
@@ -39,8 +39,8 @@ uvicorn app.main:app --reload
 
 ## Production image
 ```bash
-docker build -t ansible-z-backend .
-docker run -p 8000:8000 --env-file .env ansible-z-backend
+docker build -t neviri-ansi-backend .
+docker run -p 8000:8000 --env-file .env neviri-ansi-backend
 ```
 
 The image applies migrations, then serves on `:8000` with a `/health` healthcheck,

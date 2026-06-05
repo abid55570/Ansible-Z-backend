@@ -26,7 +26,7 @@ class _FakeConnection:
 def test_swift_roundtrip_via_dispatch(monkeypatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "storage_provider", "swift")
-    monkeypatch.setattr(settings, "swift_container", "ansible-z")
+    monkeypatch.setattr(settings, "swift_container", "neviri-ansi")
 
     fake = _FakeConnection()
     monkeypatch.setattr(swift_storage.openstack, "connect", lambda **kwargs: fake)
@@ -35,4 +35,4 @@ def test_swift_roundtrip_via_dispatch(monkeypatch):
     storage.ensure_bucket()
     storage.put_object("generations/1/uat.zip", b"swift-bytes")
     assert storage.get_object("generations/1/uat.zip") == b"swift-bytes"
-    assert fake.object_store.created_container == "ansible-z"
+    assert fake.object_store.created_container == "neviri-ansi"

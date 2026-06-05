@@ -10,8 +10,8 @@ from app.services import storage
 settings = get_settings()
 print(f"provider={settings.storage_provider} region={settings.os_region} container={settings.swift_container}")
 
-key = "ansible-z-smoke.txt"
-payload = b"hello from ansible-z smoke"
+key = "neviri-ansi-smoke.txt"
+payload = b"hello from neviri-ansi smoke"
 
 print("1. ensure_bucket / container ...")
 storage.ensure_bucket()
