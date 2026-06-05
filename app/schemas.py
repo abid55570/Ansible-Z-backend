@@ -18,11 +18,19 @@ class TemplateSummary(BaseModel):
     ready: bool
 
 
+class SecurityGroupRule(BaseModel):
+    name: str
+    inbound: list[str] = []
+    outbound: list[str] = []
+
+
 class TemplateDetail(TemplateSummary):
     version: str
     roles: list[str] = []
     variables: dict = {}
     diagram: dict | None = None
+    key_points: list[str] = []
+    security_groups: list[SecurityGroupRule] = []
 
 
 class ProjectCreate(BaseModel):

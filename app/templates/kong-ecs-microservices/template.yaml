@@ -114,3 +114,28 @@ diagram:
     - { from: alb, to: kong }
     - { from: kong, to: svc }
     - { from: svc, to: db }
+
+key_points:
+  - "All external traffic flows through the Kong API gateway."
+  - "No direct access to the ECS services or RDS — only the ALB is public."
+  - "Developers reach the network only over the VPN."
+  - "Kong handles authentication, routing, rate limiting and logging."
+  - "The bastion is the only SSH entry point (from the VPN CIDR)."
+  - "All compute and data tiers sit in private subnets."
+
+security_groups:
+  - name: "ALB SG"
+    inbound: ["HTTPS 443 / HTTP 80 from the Internet"]
+    outbound: ["8000 to Kong SG"]
+  - name: "Kong SG"
+    inbound: ["8000 from ALB SG"]
+    outbound: ["8080 to ECS SG"]
+  - name: "ECS Service SG"
+    inbound: ["8080 from Kong SG"]
+    outbound: ["3306 to RDS SG"]
+  - name: "RDS SG"
+    inbound: ["MySQL 3306 from ECS SG"]
+    outbound: ["None"]
+  - name: "Bastion SG"
+    inbound: ["SSH 22 from the VPN / office CIDR"]
+    outbound: ["All traffic to the private subnets"]

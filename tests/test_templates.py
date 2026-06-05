@@ -25,6 +25,9 @@ def test_template_detail(client):
     assert body["roles"]
     # ready templates ship a single-view diagram
     assert body["diagram"]["nodes"] and body["diagram"]["edges"]
+    # annotation panels: key points + security-group rules
+    assert body["key_points"]
+    assert body["security_groups"][0]["name"] and body["security_groups"][0]["inbound"]
 
 
 def test_every_template_has_a_diagram(client):

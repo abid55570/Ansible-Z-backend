@@ -70,3 +70,23 @@ diagram:
     - { from: sg, to: app, port: security_group }
     - { from: priv, to: db, port: subnets }
     - { from: alb, to: app }
+
+key_points:
+  - "The public ALB is the only internet-facing resource."
+  - "App tier and database live in private subnets."
+  - "Admin access is via the bastion (or SSM) from the office IP only."
+  - "DB credentials belong in ansible-vault, never in plain group_vars."
+
+security_groups:
+  - name: "ALB SG"
+    inbound: ["HTTPS 443 / HTTP 80 from the Internet"]
+    outbound: ["App port to App SG"]
+  - name: "App SG"
+    inbound: ["App port from ALB SG only"]
+    outbound: ["DB port to RDS SG"]
+  - name: "Bastion SG"
+    inbound: ["SSH 22 from the office IP only"]
+    outbound: ["SSH to the private subnets"]
+  - name: "RDS SG"
+    inbound: ["DB port from App SG only"]
+    outbound: ["None"]

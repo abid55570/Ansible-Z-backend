@@ -23,3 +23,14 @@ diagram:
     - { from: vpc, to: sg, port: vpc }
     - { from: kms, to: logs }
     - { from: logs, to: trail }
+
+key_points:
+  - "Isolated cardholder-data environment — no internet gateway."
+  - "All data encrypted with KMS; every API call logged via CloudTrail."
+  - "Admin access restricted to the office IP allow-list (UAT/PROD)."
+  - "Vault tokenisation, FIM, AV and centralised logging satisfy PCI controls."
+
+security_groups:
+  - name: "Restricted CDE SG"
+    inbound: ["Only the office IP, on required ports"]
+    outbound: ["Only to in-scope CDE services"]
