@@ -36,6 +36,8 @@ IR = {
         {"id": "api1", "type": "api_gateway", "props": {}},
         {"id": "evt1", "type": "eventbridge", "props": {}},
         {"id": "ep1", "type": "vpc_endpoint", "props": {}, "inputs": {"vpc": "vpc1"}},
+        {"id": "ecs1", "type": "ecs_cluster", "props": {}},
+        {"id": "svc1", "type": "ecs_service", "props": {}, "inputs": {"cluster": "ecs1", "subnets": ["pub1", "pub2"]}},
     ],
 }
 

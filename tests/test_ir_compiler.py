@@ -114,6 +114,8 @@ ALL_BLOCKS_IR = {
         {"id": "api", "type": "api_gateway", "props": {}},
         {"id": "events", "type": "eventbridge", "props": {}},
         {"id": "ep", "type": "vpc_endpoint", "props": {}, "inputs": {"vpc": "vpc"}},
+        {"id": "ecs", "type": "ecs_cluster", "props": {}},
+        {"id": "svc", "type": "ecs_service", "props": {}, "inputs": {"cluster": "ecs", "subnets": ["pub"]}},
     ],
 }
 
@@ -126,5 +128,5 @@ def test_all_blocks_compile_to_valid_yaml():
     for marker in ("Internet gateway", "NAT gateway", "Route table", "S3 bucket", "S3 website", "Target group",
                    "Launch template", "Lambda function", "DynamoDB table", "KMS key", "IAM role",
                    "EKS cluster", "EKS node group", "Transit gateway", "VPN gateway", "CloudTrail",
-                   "API gateway", "EventBridge rule", "VPC endpoint"):
+                   "API gateway", "EventBridge rule", "VPC endpoint", "ECS cluster", "ECS service"):
         assert marker in site

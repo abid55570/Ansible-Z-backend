@@ -64,6 +64,7 @@ diagram:
     - { id: alb_sg, type: security_group, label: "ALB SG" }
     - { id: alb, type: alb, label: "Application LB" }
     - { id: tg, type: target_group, label: "Target group (ip)" }
+    - { id: cluster, type: ecs_cluster, label: "ECS cluster" }
     - { id: svc, type: ecs_service, label: "ECS Fargate service" }
   edges:
     - { from: vpc, to: igw, port: vpc }
@@ -74,5 +75,8 @@ diagram:
     - { from: pub_b, to: alb, port: subnets }
     - { from: alb_sg, to: alb, port: security_group }
     - { from: vpc, to: tg, port: vpc }
+    - { from: cluster, to: svc, port: cluster }
+    - { from: pub_a, to: svc, port: subnets }
+    - { from: pub_b, to: svc, port: subnets }
     - { from: tg, to: svc }
     - { from: alb, to: svc }

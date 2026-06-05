@@ -388,6 +388,59 @@ def _vpc_endpoint(node, refs, ctx):
     }
 
 
+def _ecs_cluster(node, refs, ctx):
+    return {
+        "name": f"ECS cluster: {node['id']}",
+        "community.aws.ecs_cluster": {
+            "name": node["props"].get("name", node["id"]),
+            "region": ctx["region"],
+            "state": "present",
+        },
+    }
+
+
+def _ecs_service(node, refs, ctx):
+    p = node["props"]
+    name = node["id"]
+    return [
+        {
+            "name": f"ECS task definition: {name}",
+            "community.aws.ecs_taskdefinition": {
+                "family": f"{name}-task",
+                "region": ctx["region"],
+                "launch_type": "FARGATE",
+                "network_mode": "awsvpc",
+                "cpu": p.get("cpu", "512"),
+                "memory": p.get("memory", "1024"),
+                "execution_role_arn": p.get(
+                    "execution_role_arn", "arn:aws:iam::000000000000:role/ecsTaskExecutionRole"
+                ),
+                "containers": [
+                    {
+                        "name": f"{name}-app",
+                        "image": p.get("image", "public.ecr.aws/nginx/nginx:latest"),
+                        "essential": True,
+                        "portMappings": [{"containerPort": p.get("container_port", 80), "protocol": "tcp"}],
+                    }
+                ],
+                "state": "present",
+            },
+        },
+        {
+            "name": f"ECS service: {name}",
+            "community.aws.ecs_service": {
+                "name": f"{name}-svc",
+                "cluster": refs["cluster"],
+                "task_definition": f"{name}-task",
+                "desired_count": p.get("desired_count", 2),
+                "launch_type": "FARGATE",
+                "network_configuration": {"subnets": refs["subnets"], "assign_public_ip": False},
+                "state": "present",
+            },
+        },
+    ]
+
+
 BLOCKS: dict[str, dict] = {
     "vpc": {
         "inputs": {},
@@ -618,5 +671,27 @@ BLOCKS: dict[str, dict] = {
         },
         "output": "endpoint.vpc_endpoint_id",
         "render": _vpc_endpoint,
+    },
+    "ecs_cluster": {
+        "inputs": {},
+        "props": {"name": {"type": "string", "guidance": "ECS cluster name."}},
+        "output": "cluster.clusterName",
+        "render": _ecs_cluster,
+    },
+    "ecs_service": {
+        "inputs": {
+            "cluster": {"type": "ecs_cluster", "many": False},
+            "subnets": {"type": "subnet", "many": True},
+        },
+        "props": {
+            "image": {"type": "string", "default": "public.ecr.aws/nginx/nginx:latest", "guidance": "Container image."},
+            "container_port": {"type": "number", "default": 80, "guidance": "Port the container listens on."},
+            "desired_count": {"type": "number", "default": 2, "guidance": "Number of running tasks."},
+            "cpu": {"type": "string", "default": "512", "guidance": "Fargate task CPU units."},
+            "memory": {"type": "string", "default": "1024", "guidance": "Fargate task memory (MiB)."},
+            "execution_role_arn": {"type": "string", "guidance": "ECS task execution role ARN."},
+        },
+        "output": "service.serviceName",
+        "render": _ecs_service,
     },
 }

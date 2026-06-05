@@ -44,6 +44,8 @@ ICON_MAP: dict[str, tuple[str, str]] = {
     "api_gateway": ("diagrams.aws.network", "APIGateway"),
     "eventbridge": ("diagrams.aws.integration", "Eventbridge"),
     "vpc_endpoint": ("diagrams.aws.network", "Endpoint"),
+    "ecs_cluster": ("diagrams.aws.compute", "ECS"),
+    "ecs_service": ("diagrams.aws.compute", "ECS"),
 }
 
 
