@@ -1,4 +1,4 @@
-id: vietpay-bastion-alb
+id: bastion-control-alb
 name: "Bastion + Control + ALB"
 version: 0.1.0
 pci: capable
@@ -9,10 +9,10 @@ variables:
   project_name:
     type: string
     required: true
-    example: "vietpay"
+    example: "acme"
     guidance:
       what: "Short slug used to name and tag all resources."
-      how_to_get: "Pick a lowercase name, e.g. 'vietpay'."
+      how_to_get: "Pick a lowercase name, e.g. 'acme'."
 
   aws_region:
     type: string

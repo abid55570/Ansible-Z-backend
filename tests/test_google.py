@@ -8,7 +8,7 @@ def test_verify_ok(monkeypatch):
     monkeypatch.setattr(
         google_module.google_id_token,
         "verify_oauth2_token",
-        lambda token, request, audience: {
+        lambda token, request, audience, **kwargs: {
             "iss": "accounts.google.com",
             "sub": "1",
             "email": "a@b.com",
@@ -23,14 +23,14 @@ def test_verify_bad_issuer(monkeypatch):
     monkeypatch.setattr(
         google_module.google_id_token,
         "verify_oauth2_token",
-        lambda token, request, audience: {"iss": "evil.example.com"},
+        lambda token, request, audience, **kwargs: {"iss": "evil.example.com"},
     )
     with pytest.raises(GoogleAuthError):
         verify_google_id_token("token")
 
 
 def test_verify_underlying_failure(monkeypatch):
-    def _boom(token, request, audience):
+    def _boom(token, request, audience, **kwargs):
         raise ValueError("signature invalid")
 
     monkeypatch.setattr(google_module.google_id_token, "verify_oauth2_token", _boom)

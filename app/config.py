@@ -18,6 +18,9 @@ class Settings(BaseSettings):
 
     # google sign-in
     google_client_id: str = ""
+    # Tolerance for ID-token iat/exp checks. Keep small in production; raise it
+    # only when the host clock is skewed from real time (e.g. a dev sandbox).
+    google_clock_skew_seconds: int = 10
 
     # database
     database_url: str = "sqlite+pysqlite:///:memory:"

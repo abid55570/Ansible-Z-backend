@@ -9,10 +9,10 @@ variables:
   project_name:
     type: string
     required: true
-    example: "vietpay-web"
+    example: "acme-web"
     guidance:
       what: "Short slug used to name and tag all resources."
-      how_to_get: "Pick a lowercase name, e.g. 'vietpay-web'."
+      how_to_get: "Pick a lowercase name, e.g. 'acme-web'."
 
   aws_region:
     type: string

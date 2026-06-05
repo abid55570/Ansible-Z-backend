@@ -25,7 +25,7 @@ def test_sample_config_uses_defaults_examples_and_fallbacks():
 
 # The three environment-agnostic required vars (office_ip is scoped to uat/prod only).
 BASE_VARS = {
-    "project_name": "vietpay-web",
+    "project_name": "acme-web",
     "aws_region": "ap-south-1",
     "vpc_cidr": "10.20.0.0/16",
 }
@@ -78,7 +78,7 @@ def test_validate_uat_requires_office_ip():
 def test_render_project_ok():
     files = render_project("web-3tier", BASE_VARS)
     assert "README.md" in files
-    assert "vietpay-web" in files["README.md"]
+    assert "acme-web" in files["README.md"]
     assert "ap-south-1" in files["README.md"]
 
 

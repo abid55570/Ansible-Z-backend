@@ -1,7 +1,7 @@
 from app.config import get_settings
 
 WEB3_CONFIG = {
-    "project_name": "vietpay-web",
+    "project_name": "acme-web",
     "aws_region": "ap-south-1",
     "vpc_cidr": "10.20.0.0/16",
     "office_ip": "203.0.113.10/32",
