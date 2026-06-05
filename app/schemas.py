@@ -39,6 +39,11 @@ class ProjectCreate(BaseModel):
     config: dict = {}
 
 
+class ProjectUpdate(BaseModel):
+    name: str
+    config: dict = {}
+
+
 class ProjectOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

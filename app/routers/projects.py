@@ -7,7 +7,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import Generation, Project, User
-from app.schemas import GenerateIn, GenerationOut, ProjectCreate, ProjectOut
+from app.schemas import GenerateIn, GenerationOut, ProjectCreate, ProjectOut, ProjectUpdate
 from app.ir.compiler import IRError, compile_ir
 from app.services import ansible_check, day2, linter, packager, storage
 from app.services.generator import TemplateError, load_manifest, render_project, template_is_ready
@@ -53,6 +53,22 @@ def get_project(
     db: Session = Depends(get_db),
 ) -> Project:
     return _get_owned_project(project_id, user, db)
+
+
+@router.put("/{project_id}", response_model=ProjectOut)
+def update_project(
+    project_id: int,
+    body: ProjectUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Project:
+    """Update a saved design in place (name + IR config) — powers the canvas Save button."""
+    project = _get_owned_project(project_id, user, db)
+    project.name = body.name
+    project.config = body.config
+    db.commit()
+    db.refresh(project)
+    return project
 
 
 @router.post("/{project_id}/generate", response_model=GenerationOut)
