@@ -5,6 +5,7 @@ CloudFormation, Pulumi, CDK, Bicep, Kubernetes and Compose register here too.
 """
 
 from app.ir.compiler import compile_ir
+from app.ir.targets.cloudformation import compile_cloudformation
 from app.ir.targets.terraform import compile_terraform
 
 
@@ -24,6 +25,12 @@ TARGETS: dict = {
         "coverage": "full",
         "description": "HCL for the AWS provider — run with terraform or tofu.",
         "compile": compile_terraform,
+    },
+    "cloudformation": {
+        "label": "CloudFormation",
+        "coverage": "partial",
+        "description": "AWS CloudFormation template (JSON) — core networking, compute, storage & data.",
+        "compile": compile_cloudformation,
     },
 }
 
