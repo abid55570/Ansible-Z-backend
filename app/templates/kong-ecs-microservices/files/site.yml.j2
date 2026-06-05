@@ -1,0 +1,328 @@
+{% raw %}---
+# VPN-only access -> ALB -> Kong API gateway (ECS) -> private ECS microservices,
+# with RDS MySQL Multi-AZ and a bastion. Values come from group_vars/all.yml.
+- name: Provision Kong + ECS microservices platform
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - amazon.aws
+    - community.aws
+  tasks:
+    - name: Create VPC
+      amazon.aws.ec2_vpc_net:
+        name: "{{ project_name }}-{{ environment_name }}-vpc"
+        cidr_block: "{{ vpc_cidr }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: vpc
+
+    - name: Internet gateway
+      amazon.aws.ec2_vpc_igw:
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: igw
+
+    - name: VPN gateway (corporate IPSec access)
+      amazon.aws.ec2_vpc_vgw:
+        name: "{{ project_name }}-vgw"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        type: ipsec.1
+        tags: "{{ common_tags }}"
+        state: present
+
+    - name: Public subnet A
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ public_a_cidr }}"
+        az: "{{ az_a }}"
+        region: "{{ aws_region }}"
+        map_public: true
+        tags: "{{ common_tags | combine({'Name': project_name + '-public-a', 'Role': 'public'}) }}"
+        state: present
+      register: pub_a
+
+    - name: Public subnet B
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ public_b_cidr }}"
+        az: "{{ az_b }}"
+        region: "{{ aws_region }}"
+        map_public: true
+        tags: "{{ common_tags | combine({'Name': project_name + '-public-b', 'Role': 'public'}) }}"
+        state: present
+      register: pub_b
+
+    - name: Private subnet A
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ private_a_cidr }}"
+        az: "{{ az_a }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags | combine({'Name': project_name + '-private-a', 'Role': 'private'}) }}"
+        state: present
+      register: priv_a
+
+    - name: Private subnet B
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ private_b_cidr }}"
+        az: "{{ az_b }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags | combine({'Name': project_name + '-private-b', 'Role': 'private'}) }}"
+        state: present
+      register: priv_b
+
+    - name: NAT gateway for private egress
+      amazon.aws.ec2_vpc_nat_gateway:
+        subnet_id: "{{ pub_a.subnet.id }}"
+        region: "{{ aws_region }}"
+        wait: true
+        if_exist_do_not_create: true
+        tags: "{{ common_tags }}"
+        state: present
+      register: nat
+
+    - name: Public route table
+      amazon.aws.ec2_vpc_route_table:
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        subnets:
+          - "{{ pub_a.subnet.id }}"
+          - "{{ pub_b.subnet.id }}"
+        routes:
+          - dest: 0.0.0.0/0
+            gateway_id: "{{ igw.gateway_id }}"
+        tags: "{{ common_tags | combine({'Name': project_name + '-public-rt'}) }}"
+        state: present
+
+    - name: Private route table via NAT
+      amazon.aws.ec2_vpc_route_table:
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        subnets:
+          - "{{ priv_a.subnet.id }}"
+          - "{{ priv_b.subnet.id }}"
+        routes:
+          - dest: 0.0.0.0/0
+            nat_gateway_id: "{{ nat.nat_gateway_id }}"
+        tags: "{{ common_tags | combine({'Name': project_name + '-private-rt'}) }}"
+        state: present
+
+    - name: ALB security group (HTTPS from anywhere)
+      amazon.aws.ec2_security_group:
+        name: "{{ project_name }}-alb-sg"
+        description: "Public ALB"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - { proto: tcp, ports: [443, 80], cidr_ip: 0.0.0.0/0 }
+        tags: "{{ common_tags }}"
+        state: present
+      register: alb_sg
+
+    - name: Kong security group (from ALB only)
+      amazon.aws.ec2_security_group:
+        name: "{{ project_name }}-kong-sg"
+        description: "Kong proxy from the ALB"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - { proto: tcp, ports: [8000], group_id: "{{ alb_sg.group_id }}" }
+        tags: "{{ common_tags }}"
+        state: present
+      register: kong_sg
+
+    - name: ECS service security group (from Kong only)
+      amazon.aws.ec2_security_group:
+        name: "{{ project_name }}-ecs-sg"
+        description: "Microservices from Kong"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - { proto: tcp, ports: [8080], group_id: "{{ kong_sg.group_id }}" }
+        tags: "{{ common_tags }}"
+        state: present
+      register: ecs_sg
+
+    - name: RDS security group (MySQL from ECS only)
+      amazon.aws.ec2_security_group:
+        name: "{{ project_name }}-rds-sg"
+        description: "MySQL from the ECS services"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - { proto: tcp, ports: [3306], group_id: "{{ ecs_sg.group_id }}" }
+        tags: "{{ common_tags }}"
+        state: present
+      register: rds_sg
+
+    - name: Bastion security group (SSH from VPN CIDR only)
+      amazon.aws.ec2_security_group:
+        name: "{{ project_name }}-bastion-sg"
+        description: "SSH from corporate / VPN range"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - { proto: tcp, ports: [22], cidr_ip: "{{ office_ip }}" }
+        tags: "{{ common_tags }}"
+        state: present
+      register: bastion_sg
+
+    - name: ECS task execution role
+      amazon.aws.iam_role:
+        name: "{{ project_name }}-ecs-exec"
+        assume_role_policy_document: '{ "Version": "2012-10-17", "Statement": [{ "Effect": "Allow", "Principal": {"Service": "ecs-tasks.amazonaws.com"}, "Action": "sts:AssumeRole" }] }'
+        managed_policies:
+          - "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+        state: present
+      register: exec_role
+
+    - name: Kong target group (ip)
+      community.aws.elb_target_group:
+        name: "{{ project_name }}-kong-tg"
+        region: "{{ aws_region }}"
+        protocol: HTTP
+        port: 8000
+        vpc_id: "{{ vpc.vpc.id }}"
+        target_type: ip
+        health_check_path: /status
+        state: present
+
+    - name: Application load balancer
+      amazon.aws.elb_application_lb:
+        name: "{{ project_name }}-alb"
+        region: "{{ aws_region }}"
+        subnets:
+          - "{{ pub_a.subnet.id }}"
+          - "{{ pub_b.subnet.id }}"
+        security_groups:
+          - "{{ alb_sg.group_id }}"
+        listeners:
+          - Protocol: HTTP
+            Port: 80
+            DefaultActions:
+              - Type: forward
+                TargetGroupName: "{{ project_name }}-kong-tg"
+        state: present
+
+    - name: ECS cluster
+      community.aws.ecs_cluster:
+        name: "{{ project_name }}-cluster"
+        region: "{{ aws_region }}"
+        state: present
+
+    - name: Kong task definition (Fargate)
+      community.aws.ecs_taskdefinition:
+        family: "{{ project_name }}-kong"
+        region: "{{ aws_region }}"
+        launch_type: FARGATE
+        network_mode: awsvpc
+        cpu: "512"
+        memory: "1024"
+        execution_role_arn: "{{ exec_role.arn }}"
+        containers:
+          - name: kong
+            image: "{{ kong_image }}"
+            essential: true
+            portMappings:
+              - { containerPort: 8000, protocol: tcp }
+        state: present
+
+    - name: Kong service
+      community.aws.ecs_service:
+        name: "{{ project_name }}-kong-svc"
+        cluster: "{{ project_name }}-cluster"
+        task_definition: "{{ project_name }}-kong"
+        desired_count: 2
+        launch_type: FARGATE
+        network_configuration:
+          subnets:
+            - "{{ priv_a.subnet.id }}"
+            - "{{ priv_b.subnet.id }}"
+          security_groups:
+            - "{{ kong_sg.group_id }}"
+          assign_public_ip: false
+        load_balancers:
+          - targetGroupArn: "{{ project_name }}-kong-tg"
+            containerName: kong
+            containerPort: 8000
+        state: present
+
+    - name: Microservices task definition (Fargate)
+      community.aws.ecs_taskdefinition:
+        family: "{{ project_name }}-svc"
+        region: "{{ aws_region }}"
+        launch_type: FARGATE
+        network_mode: awsvpc
+        cpu: "512"
+        memory: "1024"
+        execution_role_arn: "{{ exec_role.arn }}"
+        containers:
+          - name: app
+            image: "{{ service_image }}"
+            essential: true
+            portMappings:
+              - { containerPort: 8080, protocol: tcp }
+        state: present
+
+    - name: Microservices service
+      community.aws.ecs_service:
+        name: "{{ project_name }}-svc"
+        cluster: "{{ project_name }}-cluster"
+        task_definition: "{{ project_name }}-svc"
+        desired_count: 3
+        launch_type: FARGATE
+        network_configuration:
+          subnets:
+            - "{{ priv_a.subnet.id }}"
+            - "{{ priv_b.subnet.id }}"
+          security_groups:
+            - "{{ ecs_sg.group_id }}"
+          assign_public_ip: false
+        state: present
+
+    - name: DB subnet group
+      amazon.aws.rds_subnet_group:
+        name: "{{ project_name }}-db-subnets"
+        region: "{{ aws_region }}"
+        description: "Private DB subnets for {{ project_name }}"
+        subnets:
+          - "{{ priv_a.subnet.id }}"
+          - "{{ priv_b.subnet.id }}"
+        state: present
+
+    - name: RDS MySQL (Multi-AZ, private)
+      amazon.aws.rds_instance:
+        id: "{{ project_name }}-mysql"
+        region: "{{ aws_region }}"
+        engine: mysql
+        db_instance_class: db.t3.medium
+        allocated_storage: 50
+        master_username: "{{ db_username }}"
+        master_user_password: "{{ db_password }}"
+        db_subnet_group_name: "{{ project_name }}-db-subnets"
+        vpc_security_group_ids:
+          - "{{ rds_sg.group_id }}"
+        multi_az: true
+        publicly_accessible: false
+        state: present
+
+    - name: Bastion host (SSH entry point)
+      amazon.aws.ec2_instance:
+        name: "{{ project_name }}-bastion"
+        region: "{{ aws_region }}"
+        instance_type: t3.micro
+        image_id: "{{ ami_id }}"
+        vpc_subnet_id: "{{ pub_a.subnet.id }}"
+        security_groups:
+          - "{{ bastion_sg.group_id }}"
+        network:
+          assign_public_ip: true
+        tags: "{{ common_tags | combine({'Role': 'bastion'}) }}"
+        state: started
+{% endraw %}

@@ -1,0 +1,51 @@
+id: backup-vault-dr
+name: "Centralized Backup Vault"
+version: 0.1.0
+pci: capable
+tier: enterprise
+summary: "AWS Backup: an encrypted vault with a scheduled plan and a tag-based selection across services."
+roles: [backup_vault, backup_plan, backup_selection]
+
+variables:
+  project_name:
+    type: string
+    required: true
+    example: "acme"
+    guidance:
+      what: "Short slug used to name and tag all resources."
+      how_to_get: "Pick a lowercase name, e.g. 'acme'."
+
+  aws_region:
+    type: string
+    required: true
+    example: "ap-south-1"
+    guidance:
+      what: "AWS region for the backup vault."
+      how_to_get: "Mumbai = ap-south-1, Singapore = ap-southeast-1."
+
+  schedule:
+    type: string
+    required: false
+    default: "cron(0 5 * * ? *)"
+    guidance:
+      what: "When the daily backup runs (UTC cron)."
+      how_to_get: "Default = 05:00 UTC daily."
+
+  retention_days:
+    type: number
+    required: false
+    default: 35
+    guidance:
+      what: "How long recovery points are kept before deletion."
+      how_to_get: "e.g. 35 for ~5 weeks; raise for compliance."
+
+diagram:
+  nodes:
+    - { id: role, type: iam_role, label: "Backup role" }
+    - { id: vault, type: backup_vault, label: "Backup vault" }
+    - { id: plan, type: backup_plan, label: "Backup plan" }
+    - { id: selection, type: backup_selection, label: "Tag selection" }
+  edges:
+    - { from: vault, to: plan }
+    - { from: role, to: selection }
+    - { from: plan, to: selection }

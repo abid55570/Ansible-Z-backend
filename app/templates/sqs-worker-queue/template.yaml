@@ -1,0 +1,53 @@
+id: sqs-worker-queue
+name: "SQS Worker Queue"
+version: 0.1.0
+pci: scope-reducer
+tier: enterprise
+summary: "Decoupled async processing: an SQS queue with a dead-letter queue, an SNS topic, and a Lambda worker."
+roles: [sqs, sns, lambda_worker]
+
+variables:
+  project_name:
+    type: string
+    required: true
+    example: "orders"
+    guidance:
+      what: "Short slug used to name and tag all resources."
+      how_to_get: "Pick a lowercase name, e.g. 'orders'."
+
+  aws_region:
+    type: string
+    required: true
+    example: "ap-south-1"
+    guidance:
+      what: "AWS region to deploy into."
+      how_to_get: "Mumbai = ap-south-1, Singapore = ap-southeast-1."
+
+  lambda_runtime:
+    type: string
+    required: false
+    default: "python3.12"
+    guidance:
+      what: "Lambda runtime for the worker."
+      how_to_get: "e.g. python3.12, nodejs20.x."
+
+  lambda_handler:
+    type: string
+    required: false
+    default: "handler.main"
+    guidance:
+      what: "Entrypoint the worker invokes."
+      how_to_get: "<file>.<function>, e.g. handler.main."
+
+diagram:
+  nodes:
+    - { id: queue, type: sqs, label: "Work queue" }
+    - { id: dlq, type: sqs, label: "Dead-letter queue" }
+    - { id: topic, type: sns, label: "Events topic" }
+    - { id: role, type: iam_role, label: "Worker role" }
+    - { id: worker, type: lambda, label: "Worker Lambda" }
+  edges:
+    - { from: queue, to: dlq }
+    - { from: queue, to: worker }
+    - { from: role, to: worker }
+    - { from: worker, to: topic }

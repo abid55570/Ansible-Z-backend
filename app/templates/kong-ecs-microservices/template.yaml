@@ -1,0 +1,116 @@
+id: kong-ecs-microservices
+name: "Kong + ECS Microservices"
+version: 0.1.0
+pci: capable
+tier: enterprise
+summary: "VPN-only access → ALB → Kong API gateway → private ECS Fargate microservices, with RDS MySQL and a bastion."
+roles: [vpc, security_groups, vpn, alb, kong_gateway, ecs_microservices, rds_mysql, bastion]
+
+variables:
+  project_name:
+    type: string
+    required: true
+    example: "acme-api"
+    guidance:
+      what: "Short slug used to name and tag all resources."
+      how_to_get: "Pick a lowercase name, e.g. 'acme-api'."
+
+  aws_region:
+    type: string
+    required: true
+    example: "ap-south-1"
+    guidance:
+      what: "AWS region to deploy into."
+      how_to_get: "Mumbai = ap-south-1, Singapore = ap-southeast-1."
+
+  vpc_cidr:
+    type: cidr
+    required: true
+    default: "10.0.0.0/16"
+    guidance:
+      what: "Top-level network range for the VPC."
+      how_to_get: "Use a /16 that does not overlap your corporate / VPN network."
+
+  ami_id:
+    type: string
+    required: false
+    guidance:
+      what: "Ubuntu 22.04 AMI for the bastion (set before running)."
+      how_to_get: "EC2 console -> AMIs -> filter 'ubuntu-jammy-22.04'."
+
+  service_image:
+    type: string
+    required: true
+    default: "public.ecr.aws/nginx/nginx:latest"
+    guidance:
+      what: "Container image for your microservices."
+      how_to_get: "An ECR or public image ref for your service."
+
+  db_password:
+    type: string
+    required: true
+    scope: [uat, prod]
+    example: "ChangeMe-store-in-vault"
+    guidance:
+      what: "Master password for RDS MySQL — keep it in ansible-vault."
+      how_to_get: "Generate a strong password; store it in a vault file."
+
+  office_ip:
+    type: cidr
+    required: true
+    scope: [uat, prod]
+    example: "203.0.113.10/32"
+    guidance:
+      what: "Corporate / VPN CIDR allowed to reach the bastion (SSH)."
+      how_to_get: "Your office or VPN egress range, e.g. 203.0.113.0/24."
+
+diagram:
+  nodes:
+    - { id: vpc, type: vpc, label: "VPC 10.0.0.0/16" }
+    - { id: igw, type: igw, label: "Internet gateway" }
+    - { id: vgw, type: vpn_gateway, label: "VPN gateway (IPSec)" }
+    - { id: pub_a, type: subnet, label: "Public subnet A" }
+    - { id: pub_b, type: subnet, label: "Public subnet B" }
+    - { id: priv_a, type: subnet, label: "Private subnet A" }
+    - { id: priv_b, type: subnet, label: "Private subnet B" }
+    - { id: nat, type: nat_gateway, label: "NAT gateway" }
+    - { id: alb_sg, type: security_group, label: "ALB SG" }
+    - { id: kong_sg, type: security_group, label: "Kong SG" }
+    - { id: ecs_sg, type: security_group, label: "ECS SG" }
+    - { id: rds_sg, type: security_group, label: "RDS SG" }
+    - { id: bastion_sg, type: security_group, label: "Bastion SG" }
+    - { id: alb, type: alb, label: "Application LB (HTTPS)" }
+    - { id: bastion, type: ec2_instance, label: "Bastion (EC2)" }
+    - { id: cluster, type: ecs_cluster, label: "ECS cluster" }
+    - { id: kong, type: ecs_service, label: "Kong Gateway" }
+    - { id: svc, type: ecs_service, label: "Microservices" }
+    - { id: db, type: rds, label: "RDS MySQL (Multi-AZ)" }
+  edges:
+    - { from: vpc, to: igw, port: vpc }
+    - { from: vpc, to: vgw, port: vpc }
+    - { from: vpc, to: pub_a, port: vpc }
+    - { from: vpc, to: pub_b, port: vpc }
+    - { from: vpc, to: priv_a, port: vpc }
+    - { from: vpc, to: priv_b, port: vpc }
+    - { from: vpc, to: alb_sg, port: vpc }
+    - { from: vpc, to: kong_sg, port: vpc }
+    - { from: vpc, to: ecs_sg, port: vpc }
+    - { from: vpc, to: rds_sg, port: vpc }
+    - { from: vpc, to: bastion_sg, port: vpc }
+    - { from: pub_a, to: nat, port: subnet }
+    - { from: pub_a, to: alb, port: subnets }
+    - { from: pub_b, to: alb, port: subnets }
+    - { from: alb_sg, to: alb, port: security_group }
+    - { from: pub_a, to: bastion, port: subnet }
+    - { from: bastion_sg, to: bastion, port: security_group }
+    - { from: cluster, to: kong, port: cluster }
+    - { from: priv_a, to: kong, port: subnets }
+    - { from: priv_b, to: kong, port: subnets }
+    - { from: cluster, to: svc, port: cluster }
+    - { from: priv_a, to: svc, port: subnets }
+    - { from: priv_b, to: svc, port: subnets }
+    - { from: priv_a, to: db, port: subnets }
+    - { from: priv_b, to: db, port: subnets }
+    - { from: alb, to: kong }
+    - { from: kong, to: svc }
+    - { from: svc, to: db }

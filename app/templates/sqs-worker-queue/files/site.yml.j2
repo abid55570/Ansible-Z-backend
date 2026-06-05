@@ -1,0 +1,66 @@
+{% raw %}---
+# Decoupled async processing: SQS work queue + dead-letter queue, an SNS topic,
+# and a Lambda worker. Values come from group_vars/all.yml (auto-loaded).
+- name: Provision SQS worker queue
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - amazon.aws
+    - community.aws
+  tasks:
+    - name: Dead-letter queue
+      community.aws.sqs_queue:
+        name: "{{ project_name }}-dlq"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: dlq
+
+    - name: Work queue (redrive failed messages to the DLQ)
+      community.aws.sqs_queue:
+        name: "{{ project_name }}-queue"
+        region: "{{ aws_region }}"
+        visibility_timeout: 60
+        redrive_policy:
+          maxReceiveCount: 5
+          deadLetterTargetArn: "{{ dlq.queue_arn }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: queue
+
+    - name: Events topic
+      community.aws.sns_topic:
+        name: "{{ project_name }}-events"
+        region: "{{ aws_region }}"
+        state: present
+
+    - name: Worker execution role
+      amazon.aws.iam_role:
+        name: "{{ project_name }}-worker-role"
+        assume_role_policy_document: '{ "Version": "2012-10-17", "Statement": [{ "Effect": "Allow", "Principal": {"Service": "lambda.amazonaws.com"}, "Action": "sts:AssumeRole" }] }'
+        managed_policies:
+          - "arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole"
+        state: present
+      register: worker_role
+
+    - name: Worker Lambda
+      amazon.aws.lambda:
+        name: "{{ project_name }}-worker"
+        region: "{{ aws_region }}"
+        runtime: "{{ lambda_runtime }}"
+        handler: "{{ lambda_handler }}"
+        role: "{{ worker_role.arn }}"
+        zip_file: "{{ lambda_zip }}"
+        state: present
+
+    - name: Subscribe the worker to the queue
+      amazon.aws.lambda_event:
+        event_source: sqs
+        function_name: "{{ project_name }}-worker"
+        region: "{{ aws_region }}"
+        source_params:
+          source_arn: "{{ queue.queue_arn }}"
+          batch_size: 10
+        state: present
+{% endraw %}
