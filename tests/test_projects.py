@@ -54,3 +54,18 @@ def test_update_requires_auth(client):
 
 def test_update_unknown_project(auth_client):
     assert auth_client.put("/projects/99999", json={"name": "x", "config": {}}).status_code == 404
+
+
+def test_delete_project(auth_client):
+    created = auth_client.post("/projects", json={"name": "X", "template_slug": "__custom__", "config": {"version": 1, "nodes": []}})
+    pid = created.json()["id"]
+    assert auth_client.delete(f"/projects/{pid}").status_code == 204
+    assert auth_client.get(f"/projects/{pid}").status_code == 404
+
+
+def test_delete_requires_auth(client):
+    assert client.delete("/projects/1").status_code == 401
+
+
+def test_delete_unknown_project(auth_client):
+    assert auth_client.delete("/projects/99999").status_code == 404

@@ -13,6 +13,13 @@ def test_list_targets(client):
     assert "ansible" in ids and "terraform" in ids
 
 
+def test_pricing(client):
+    response = client.get("/designs/pricing")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ec2"]["t3.micro"] > 0 and "db.t3.micro" in body["rds"]
+
+
 def test_validate_design_valid(auth_client):
     ir = {"region": "ap-south-1", "name": "n", "nodes": [{"id": "v", "type": "vpc", "props": {"cidr": "10.0.0.0/16"}}]}
     response = auth_client.post("/designs/validate", json=ir)

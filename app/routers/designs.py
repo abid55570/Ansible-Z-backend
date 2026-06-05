@@ -39,3 +39,14 @@ def validate_design(ir: dict = Body(...), user: User = Depends(get_current_user)
 def cost(ir: dict = Body(...), user: User = Depends(get_current_user)) -> dict:
     """Rough monthly cost estimate for a design — powers the live cost panel."""
     return estimate_cost(ir)
+
+
+@router.get("/pricing")
+def pricing() -> dict:
+    """Per-flavour monthly prices (USD) so the property panel can show cost per size."""
+    from app.services.cost import EC2_HOURLY, HOURS_PER_MONTH, RDS_HOURLY
+
+    return {
+        "ec2": {k: round(v * HOURS_PER_MONTH, 2) for k, v in EC2_HOURLY.items()},
+        "rds": {k: round(v * HOURS_PER_MONTH, 2) for k, v in RDS_HOURLY.items()},
+    }

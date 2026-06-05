@@ -637,7 +637,7 @@ BLOCKS: dict[str, dict] = {
         },
         "props": {
             "name": {"type": "string"},
-            "instance_type": {"type": "string", "default": "t3.micro", "guidance": "EC2 instance size."},
+            "instance_type": {"type": "string", "default": "t3.micro", "guidance": "EC2 instance size / flavour.", "options": ["t2.micro", "t3.micro", "t3.small", "t3.medium", "t3.large", "m5.large", "m5.xlarge", "c5.large"]},
             "ami": {"type": "string", "guidance": "AMI id (defaults to a group_var placeholder)."},
             "public": {"type": "bool", "default": False, "guidance": "Assign a public IP?"},
         },
@@ -660,7 +660,7 @@ BLOCKS: dict[str, dict] = {
         "inputs": {"subnets": {"type": "subnet", "many": True}},
         "props": {
             "engine": {"type": "string", "default": "postgres", "guidance": "Database engine."},
-            "instance_class": {"type": "string", "default": "db.t3.micro"},
+            "instance_class": {"type": "string", "default": "db.t3.micro", "guidance": "Database instance flavour.", "options": ["db.t3.micro", "db.t3.small", "db.t3.medium", "db.t3.large", "db.m5.large"]},
             "storage": {"type": "number", "default": 20, "guidance": "Allocated storage (GB)."},
             "username": {"type": "string", "default": "appadmin"},
         },
@@ -718,7 +718,7 @@ BLOCKS: dict[str, dict] = {
         "inputs": {},
         "props": {
             "name": {"type": "string"},
-            "instance_type": {"type": "string", "default": "t3.micro"},
+            "instance_type": {"type": "string", "default": "t3.micro", "guidance": "Instance flavour for the ASG.", "options": ["t2.micro", "t3.micro", "t3.small", "t3.medium", "t3.large", "m5.large"]},
             "ami": {"type": "string", "guidance": "AMI id (e.g. a Packer golden image)."},
         },
         "output": "template.launch_template_id",

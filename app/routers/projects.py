@@ -162,3 +162,17 @@ def download(
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.delete("/{project_id}", status_code=204)
+def delete_project(
+    project_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Delete a project and its generations."""
+    project = _get_owned_project(project_id, user, db)
+    db.query(Generation).filter(Generation.project_id == project.id).delete()
+    db.delete(project)
+    db.commit()
+    return Response(status_code=204)

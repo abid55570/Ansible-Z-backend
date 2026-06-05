@@ -1,0 +1,108 @@
+{% raw %}---
+# Free-Tier Lab: VPC + public subnet + IGW + security group + a t3.micro web server + an S3 bucket.
+# Every resource is AWS free-tier eligible. Deploy this to verify your generated project runs.
+# Values come from group_vars/all.yml (auto-loaded).
+- name: Provision free-tier lab
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Create VPC
+      amazon.aws.ec2_vpc_net:
+        name: "{{ project_name }}-vpc"
+        cidr_block: "{{ vpc_cidr }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: vpc
+
+    - name: Internet gateway
+      amazon.aws.ec2_vpc_igw:
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+      register: igw
+
+    - name: Public subnet
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ public_subnet_cidr }}"
+        region: "{{ aws_region }}"
+        map_public: true
+        tags: "{{ common_tags | combine({'Name': project_name + '-public'}) }}"
+        state: present
+      register: public_subnet
+
+    - name: Public route table to the internet
+      amazon.aws.ec2_vpc_route_table:
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        subnets:
+          - "{{ public_subnet.subnet.id }}"
+        routes:
+          - dest: 0.0.0.0/0
+            gateway_id: "{{ igw.gateway_id }}"
+        tags: "{{ common_tags | combine({'Name': project_name + '-public-rt'}) }}"
+        state: present
+
+    - name: Web security group
+      amazon.aws.ec2_security_group:
+        name: "{{ project_name }}-web-sg"
+        description: "HTTP from anywhere, SSH from office"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp
+            ports: [80]
+            cidr_ip: 0.0.0.0/0
+            rule_desc: "HTTP"
+          - proto: tcp
+            ports: [22]
+            cidr_ip: "{{ office_ip }}"
+            rule_desc: "SSH from office"
+        tags: "{{ common_tags }}"
+        state: present
+      register: web_sg
+
+    - name: Find latest Amazon Linux 2 AMI (free-tier eligible)
+      amazon.aws.ec2_ami_info:
+        region: "{{ aws_region }}"
+        owners: ["amazon"]
+        filters:
+          name: "amzn2-ami-hvm-*-x86_64-gp2"
+          state: available
+      register: ami
+
+    - name: Resolve the AMI id
+      ansible.builtin.set_fact:
+        free_ami: "{{ (ami.images | sort(attribute='creation_date') | last).image_id }}"
+
+    - name: Free-tier web server (t3.micro)
+      amazon.aws.ec2_instance:
+        name: "{{ project_name }}-web"
+        region: "{{ aws_region }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ free_ami }}"
+        vpc_subnet_id: "{{ public_subnet.subnet.id }}"
+        security_groups:
+          - "{{ web_sg.group_id }}"
+        network:
+          assign_public_ip: true
+        tags: "{{ common_tags | combine({'Role': 'web'}) }}"
+        user_data: |
+          #cloud-config
+          packages:
+            - httpd
+          runcmd:
+            - systemctl enable --now httpd
+            - echo "Neviri-Ansi free-tier lab is live" > /var/www/html/index.html
+        state: started
+
+    - name: S3 bucket (free-tier storage)
+      amazon.aws.s3_bucket:
+        name: "{{ bucket_name }}"
+        region: "{{ aws_region }}"
+        tags: "{{ common_tags }}"
+        state: present
+{% endraw %}
