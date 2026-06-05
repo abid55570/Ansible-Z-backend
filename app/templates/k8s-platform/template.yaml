@@ -19,6 +19,8 @@ diagram:
   edges:
     - { from: vpc, to: subnet_a, port: vpc }
     - { from: vpc, to: subnet_b, port: vpc }
-    - { from: subnet_a, to: eks }
-    - { from: subnet_b, to: eks }
+    - { from: subnet_a, to: eks, port: subnets }
+    - { from: subnet_b, to: eks, port: subnets }
+    - { from: subnet_a, to: nodes, port: subnets }
+    - { from: subnet_b, to: nodes, port: subnets }
     - { from: eks, to: nodes }

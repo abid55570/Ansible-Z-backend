@@ -17,5 +17,6 @@ diagram:
     - { id: subnet, type: subnet, label: "Private subnet" }
   edges:
     - { from: onprem, to: vgw }
+    - { from: vpc, to: vgw, port: vpc }
     - { from: vgw, to: vpc }
     - { from: vpc, to: subnet, port: vpc }

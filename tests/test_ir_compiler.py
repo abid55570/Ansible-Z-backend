@@ -116,6 +116,17 @@ ALL_BLOCKS_IR = {
         {"id": "ep", "type": "vpc_endpoint", "props": {}, "inputs": {"vpc": "vpc"}},
         {"id": "ecs", "type": "ecs_cluster", "props": {}},
         {"id": "svc", "type": "ecs_service", "props": {}, "inputs": {"cluster": "ecs", "subnets": ["pub"]}},
+        {"id": "cf", "type": "cloudfront", "props": {}},
+        {"id": "gc", "type": "glue_crawler", "props": {}},
+        {"id": "gj", "type": "glue_job", "props": {}},
+        {"id": "q", "type": "sqs", "props": {}},
+        {"id": "t", "type": "sns", "props": {}},
+        {"id": "bv", "type": "backup_vault", "props": {}},
+        {"id": "bp", "type": "backup_plan", "props": {}},
+        {"id": "bs", "type": "backup_selection", "props": {}},
+        {"id": "waf", "type": "waf", "props": {}},
+        {"id": "cw", "type": "cloudwatch", "props": {}},
+        {"id": "dc", "type": "datacenter", "props": {}},
     ],
 }
 
@@ -128,5 +139,8 @@ def test_all_blocks_compile_to_valid_yaml():
     for marker in ("Internet gateway", "NAT gateway", "Route table", "S3 bucket", "S3 website", "Target group",
                    "Launch template", "Lambda function", "DynamoDB table", "KMS key", "IAM role",
                    "EKS cluster", "EKS node group", "Transit gateway", "VPN gateway", "CloudTrail",
-                   "API gateway", "EventBridge rule", "VPC endpoint", "ECS cluster", "ECS service"):
+                   "API gateway", "EventBridge rule", "VPC endpoint", "ECS cluster", "ECS service",
+                   "CloudFront distribution", "Glue crawler", "Glue job", "SQS queue", "SNS topic",
+                   "Backup vault", "Backup plan", "Backup selection", "WAF web ACL", "CloudWatch log group",
+                   "On-prem network"):
         assert marker in site

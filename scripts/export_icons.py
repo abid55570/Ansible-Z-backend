@@ -46,6 +46,17 @@ ICON_MAP: dict[str, tuple[str, str]] = {
     "vpc_endpoint": ("diagrams.aws.network", "Endpoint"),
     "ecs_cluster": ("diagrams.aws.compute", "ECS"),
     "ecs_service": ("diagrams.aws.compute", "ECS"),
+    "cloudfront": ("diagrams.aws.network", "CloudFront"),
+    "glue_crawler": ("diagrams.aws.analytics", "GlueCrawlers"),
+    "glue_job": ("diagrams.aws.analytics", "Glue"),
+    "sqs": ("diagrams.aws.integration", "SimpleQueueServiceSqs"),
+    "sns": ("diagrams.aws.integration", "SimpleNotificationServiceSns"),
+    "backup_vault": ("diagrams.aws.storage", "Backup"),
+    "backup_plan": ("diagrams.aws.storage", "Backup"),
+    "backup_selection": ("diagrams.aws.storage", "Backup"),
+    "waf": ("diagrams.aws.security", "WAF"),
+    "cloudwatch": ("diagrams.aws.management", "Cloudwatch"),
+    "datacenter": ("diagrams.onprem.compute", "Server"),
 }
 
 

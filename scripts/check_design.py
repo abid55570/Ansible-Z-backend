@@ -38,6 +38,17 @@ IR = {
         {"id": "ep1", "type": "vpc_endpoint", "props": {}, "inputs": {"vpc": "vpc1"}},
         {"id": "ecs1", "type": "ecs_cluster", "props": {}},
         {"id": "svc1", "type": "ecs_service", "props": {}, "inputs": {"cluster": "ecs1", "subnets": ["pub1", "pub2"]}},
+        {"id": "cf1", "type": "cloudfront", "props": {}},
+        {"id": "gc1", "type": "glue_crawler", "props": {}},
+        {"id": "gj1", "type": "glue_job", "props": {}},
+        {"id": "q1", "type": "sqs", "props": {}},
+        {"id": "t1", "type": "sns", "props": {}},
+        {"id": "bv1", "type": "backup_vault", "props": {}},
+        {"id": "bp1", "type": "backup_plan", "props": {}},
+        {"id": "bs1", "type": "backup_selection", "props": {}},
+        {"id": "waf1", "type": "waf", "props": {}},
+        {"id": "cw1", "type": "cloudwatch", "props": {}},
+        {"id": "dc1", "type": "datacenter", "props": {}},
     ],
 }
 

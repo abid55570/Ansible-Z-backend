@@ -19,6 +19,7 @@ diagram:
   edges:
     - { from: vpc, to: subnet, port: vpc }
     - { from: vpc, to: sg, port: vpc }
+    - { from: vpc, to: ssm, port: vpc }
     - { from: subnet, to: ssm }
     - { from: sg, to: ssm }
     - { from: role, to: subnet }

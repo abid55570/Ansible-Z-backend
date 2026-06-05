@@ -441,6 +441,164 @@ def _ecs_service(node, refs, ctx):
     ]
 
 
+def _cloudfront(node, refs, ctx):
+    p = node["props"]
+    return {
+        "name": f"CloudFront distribution: {node['id']}",
+        "community.aws.cloudfront_distribution": {
+            "state": "present",
+            "comment": p.get("comment", node["id"]),
+            "default_root_object": p.get("index_document", "index.html"),
+            "origins": [{
+                "id": f"origin-{node['id']}",
+                "domain_name": p.get("origin_domain", "example-bucket.s3.amazonaws.com"),
+                "s3_origin_access_identity_enabled": True,
+            }],
+            "default_cache_behavior": {
+                "target_origin_id": f"origin-{node['id']}",
+                "viewer_protocol_policy": "redirect-to-https",
+            },
+            "enabled": True,
+        },
+    }
+
+
+def _glue_crawler(node, refs, ctx):
+    p = node["props"]
+    return {
+        "name": f"Glue crawler: {node['id']}",
+        "community.aws.glue_crawler": {
+            "name": p.get("name", node["id"]),
+            "database_name": p.get("database", "analytics_db"),
+            "role": p.get("role_arn", "arn:aws:iam::000000000000:role/GlueServiceRole"),
+            "targets": {"S3Targets": [{"Path": p.get("s3_path", "s3://my-bucket/")}]},
+            "state": "present",
+        },
+    }
+
+
+def _glue_job(node, refs, ctx):
+    p = node["props"]
+    return {
+        "name": f"Glue job: {node['id']}",
+        "community.aws.glue_job": {
+            "name": p.get("name", node["id"]),
+            "role": p.get("role_arn", "arn:aws:iam::000000000000:role/GlueServiceRole"),
+            "command": {"name": "glueetl", "script_location": p.get("script_location", "s3://my-bucket/etl.py")},
+            "state": "present",
+        },
+    }
+
+
+def _sqs(node, refs, ctx):
+    return {
+        "name": f"SQS queue: {node['id']}",
+        "community.aws.sqs_queue": {
+            "name": node["props"].get("name", node["id"]),
+            "region": ctx["region"],
+            "tags": TAGS,
+            "state": "present",
+        },
+    }
+
+
+def _sns(node, refs, ctx):
+    return {
+        "name": f"SNS topic: {node['id']}",
+        "community.aws.sns_topic": {
+            "name": node["props"].get("name", node["id"]),
+            "region": ctx["region"],
+            "state": "present",
+        },
+    }
+
+
+def _backup_vault(node, refs, ctx):
+    return {
+        "name": f"Backup vault: {node['id']}",
+        "amazon.aws.backup_vault": {
+            "backup_vault_name": node["props"].get("name", node["id"]),
+            "region": ctx["region"],
+            "tags": TAGS,
+            "state": "present",
+        },
+    }
+
+
+def _backup_plan(node, refs, ctx):
+    p = node["props"]
+    return {
+        "name": f"Backup plan: {node['id']}",
+        "amazon.aws.backup_plan": {
+            "backup_plan_name": p.get("name", node["id"]),
+            "region": ctx["region"],
+            "rules": [{
+                "rule_name": "daily",
+                "target_backup_vault_name": p.get("vault", "Default"),
+                "schedule_expression": p.get("schedule", "cron(0 5 * * ? *)"),
+                "lifecycle": {"delete_after_days": p.get("retention_days", 35)},
+            }],
+            "state": "present",
+        },
+    }
+
+
+def _backup_selection(node, refs, ctx):
+    p = node["props"]
+    return {
+        "name": f"Backup selection: {node['id']}",
+        "amazon.aws.backup_selection": {
+            "selection_name": p.get("name", node["id"]),
+            "backup_plan_id": p.get("plan_id", "PLAN_ID"),
+            "iam_role_arn": p.get("role_arn", "arn:aws:iam::000000000000:role/BackupServiceRole"),
+            "list_of_tags": [{"condition_type": "STRINGEQUALS", "condition_key": "Backup", "condition_value": "true"}],
+            "region": ctx["region"],
+            "state": "present",
+        },
+    }
+
+
+def _waf(node, refs, ctx):
+    return {
+        "name": f"WAF web ACL: {node['id']}",
+        "community.aws.wafv2_web_acl": {
+            "name": node["props"].get("name", node["id"]),
+            "scope": "REGIONAL",
+            "region": ctx["region"],
+            "default_action": "allow",
+            "rules": [],
+            "visibility_config": {
+                "sampled_requests_enabled": True,
+                "cloudwatch_metrics_enabled": True,
+                "metric_name": node["id"],
+            },
+            "state": "present",
+        },
+    }
+
+
+def _cloudwatch(node, refs, ctx):
+    return {
+        "name": f"CloudWatch log group: {node['id']}",
+        "amazon.aws.cloudwatchlogs_log_group": {
+            "log_group_name": node["props"].get("log_group_name", "/" + node["id"]),
+            "region": ctx["region"],
+            "retention": node["props"].get("retention_days", 90),
+            "state": "present",
+        },
+    }
+
+
+def _datacenter(node, refs, ctx):
+    # An on-prem network is managed outside this playbook — render an annotation.
+    return {
+        "name": f"On-prem network: {node['id']}",
+        "ansible.builtin.debug": {
+            "msg": node["props"].get("note", f"On-prem network '{node['id']}' is managed outside this playbook"),
+        },
+    }
+
+
 BLOCKS: dict[str, dict] = {
     "vpc": {
         "inputs": {},
@@ -693,5 +851,96 @@ BLOCKS: dict[str, dict] = {
         },
         "output": "service.serviceName",
         "render": _ecs_service,
+    },
+    "cloudfront": {
+        "inputs": {},
+        "props": {
+            "origin_domain": {"type": "string", "guidance": "Origin domain, e.g. mybucket.s3.amazonaws.com."},
+            "index_document": {"type": "string", "default": "index.html"},
+            "comment": {"type": "string"},
+        },
+        "output": "domain_name",
+        "render": _cloudfront,
+    },
+    "glue_crawler": {
+        "inputs": {},
+        "props": {
+            "name": {"type": "string"},
+            "database": {"type": "string", "default": "analytics_db"},
+            "role_arn": {"type": "string", "guidance": "Glue service role ARN."},
+            "s3_path": {"type": "string", "guidance": "S3 path to crawl, e.g. s3://bucket/."},
+        },
+        "output": "name",
+        "render": _glue_crawler,
+    },
+    "glue_job": {
+        "inputs": {},
+        "props": {
+            "name": {"type": "string"},
+            "role_arn": {"type": "string", "guidance": "Glue service role ARN."},
+            "script_location": {"type": "string", "guidance": "S3 path to the ETL script."},
+        },
+        "output": "name",
+        "render": _glue_job,
+    },
+    "sqs": {
+        "inputs": {},
+        "props": {"name": {"type": "string", "guidance": "Queue name."}},
+        "output": "queue_url",
+        "render": _sqs,
+    },
+    "sns": {
+        "inputs": {},
+        "props": {"name": {"type": "string", "guidance": "Topic name."}},
+        "output": "sns_arn",
+        "render": _sns,
+    },
+    "backup_vault": {
+        "inputs": {},
+        "props": {"name": {"type": "string", "guidance": "Vault name."}},
+        "output": "vault.backup_vault_arn",
+        "render": _backup_vault,
+    },
+    "backup_plan": {
+        "inputs": {},
+        "props": {
+            "name": {"type": "string"},
+            "vault": {"type": "string", "guidance": "Target vault name."},
+            "schedule": {"type": "string", "default": "cron(0 5 * * ? *)"},
+            "retention_days": {"type": "number", "default": 35},
+        },
+        "output": "backup_plan_id",
+        "render": _backup_plan,
+    },
+    "backup_selection": {
+        "inputs": {},
+        "props": {
+            "name": {"type": "string"},
+            "plan_id": {"type": "string", "guidance": "Backup plan id."},
+            "role_arn": {"type": "string", "guidance": "AWS Backup service role ARN."},
+        },
+        "output": "selection.selection_id",
+        "render": _backup_selection,
+    },
+    "waf": {
+        "inputs": {},
+        "props": {"name": {"type": "string", "guidance": "Web ACL name."}},
+        "output": "web_acl.id",
+        "render": _waf,
+    },
+    "cloudwatch": {
+        "inputs": {},
+        "props": {
+            "log_group_name": {"type": "string", "guidance": "Log group, e.g. /app/audit."},
+            "retention_days": {"type": "number", "default": 90},
+        },
+        "output": "log_group_name",
+        "render": _cloudwatch,
+    },
+    "datacenter": {
+        "inputs": {},
+        "props": {"note": {"type": "string", "guidance": "On-prem network managed outside this playbook."}},
+        "output": "msg",
+        "render": _datacenter,
     },
 }

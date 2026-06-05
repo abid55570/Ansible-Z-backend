@@ -12,12 +12,22 @@ variables:
 diagram:
   nodes:
     - { id: vpc, type: vpc, label: "VPC" }
+    - { id: pub_a, type: subnet, label: "Public subnet A" }
+    - { id: pub_b, type: subnet, label: "Public subnet B" }
+    - { id: sg, type: security_group, label: "ALB SG" }
     - { id: lt, type: launch_template, label: "Golden AMI LT" }
     - { id: blue, type: target_group, label: "Blue TG" }
     - { id: green, type: target_group, label: "Green TG" }
     - { id: alb, type: alb, label: "ALB" }
   edges:
-    - { from: vpc, to: alb }
+    - { from: vpc, to: pub_a, port: vpc }
+    - { from: vpc, to: pub_b, port: vpc }
+    - { from: vpc, to: sg, port: vpc }
+    - { from: vpc, to: blue, port: vpc }
+    - { from: vpc, to: green, port: vpc }
+    - { from: pub_a, to: alb, port: subnets }
+    - { from: pub_b, to: alb, port: subnets }
+    - { from: sg, to: alb, port: security_group }
     - { from: alb, to: blue }
     - { from: alb, to: green }
     - { from: lt, to: blue }
