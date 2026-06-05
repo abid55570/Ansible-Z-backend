@@ -50,24 +50,26 @@ variables:
 
   office_ip:
     type: cidr
-    required: true
+    required: false
     scope: [uat, prod]
     example: "203.0.113.10/32"
     guidance:
-      what: "The only public IP allowed to SSH the instance."
-      how_to_get: "Run: curl https://checkip.amazonaws.com  then append /32"
+      what: "Optional. If set, SSH (port 22) is opened only to this IP. Leave blank to skip SSH entirely — the web server is reachable over HTTP regardless, so you can still verify the deploy."
+      how_to_get: "Only needed if you want to SSH in. Run: curl https://checkip.amazonaws.com then append /32"
 
 key_points:
-  - "Every resource is AWS free-tier eligible — a t3.micro instance (750 hrs/mo) and a 5 GB S3 bucket."
-  - "The AMI is auto-resolved to the latest Amazon Linux 2, so it just works in any region."
-  - "Deploy it to confirm your generated project (Ansible or Terraform) provisions cleanly on a real account."
+  - "Every resource is AWS free-tier eligible — one t3.micro instance (750 hrs/mo) and a 5 GB S3 bucket."
+  - "The AMI auto-resolves to the latest Amazon Linux 2, so the same project deploys in any region."
+  - "Only project name, region and a bucket name are required — office_ip is optional (SSH lock-down)."
+  - "HTTP (port 80) is open, so you can verify the deploy in a browser without ever needing SSH."
+  - "Deploy on a fresh account to confirm your exported Ansible or Terraform runs cleanly end-to-end."
 
 diagram:
   nodes:
     - { id: vpc, type: vpc, label: "VPC" }
     - { id: subnet, type: subnet, label: "Public subnet" }
     - { id: igw, type: igw, label: "Internet gateway" }
-    - { id: sg, type: security_group, label: "Web SG (HTTP/SSH)" }
+    - { id: sg, type: security_group, label: "Web SG (HTTP open · SSH optional)" }
     - { id: web, type: ec2_instance, label: "t3.micro web (free)" }
     - { id: bucket, type: s3_bucket, label: "S3 bucket (free)" }
   edges:

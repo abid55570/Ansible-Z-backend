@@ -46,21 +46,28 @@
         tags: "{{ common_tags | combine({'Name': project_name + '-public-rt'}) }}"
         state: present
 
+    - name: Build security-group rules (HTTP always; SSH only when office_ip is set)
+      ansible.builtin.set_fact:
+        web_rules: "{{ [http_rule] + ([ssh_rule] if (office_ip | default('') | length > 0) else []) }}"
+      vars:
+        http_rule:
+          proto: tcp
+          ports: [80]
+          cidr_ip: 0.0.0.0/0
+          rule_desc: HTTP from anywhere
+        ssh_rule:
+          proto: tcp
+          ports: [22]
+          cidr_ip: "{{ office_ip }}"
+          rule_desc: SSH from office_ip
+
     - name: Web security group
       amazon.aws.ec2_security_group:
         name: "{{ project_name }}-web-sg"
-        description: "HTTP from anywhere, SSH from office"
+        description: "HTTP open to the world; SSH opened only when office_ip is provided"
         vpc_id: "{{ vpc.vpc.id }}"
         region: "{{ aws_region }}"
-        rules:
-          - proto: tcp
-            ports: [80]
-            cidr_ip: 0.0.0.0/0
-            rule_desc: "HTTP"
-          - proto: tcp
-            ports: [22]
-            cidr_ip: "{{ office_ip }}"
-            rule_desc: "SSH from office"
+        rules: "{{ web_rules }}"
         tags: "{{ common_tags }}"
         state: present
       register: web_sg
