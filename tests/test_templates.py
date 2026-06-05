@@ -35,3 +35,14 @@ def test_every_template_has_a_diagram(client):
 
 def test_template_detail_unknown(client):
     assert client.get("/templates/does-not-exist").status_code == 404
+
+
+def test_template_diagram_image(client):
+    res = client.get("/templates/web-3tier/diagram.png")
+    assert res.status_code == 200
+    assert res.headers["content-type"] == "image/png"
+    assert res.content[:8] == b"\x89PNG\r\n\x1a\n"  # PNG magic
+
+
+def test_template_diagram_image_unknown(client):
+    assert client.get("/templates/does-not-exist/diagram.png").status_code == 404
