@@ -7,6 +7,8 @@ CloudFormation, Pulumi, CDK, Bicep, Kubernetes and Compose register here too.
 from app.ir.compiler import compile_ir
 from app.ir.targets.cdk import compile_cdk
 from app.ir.targets.cloudformation import compile_cloudformation
+from app.ir.targets.compose import compile_compose
+from app.ir.targets.kubernetes import compile_kubernetes
 from app.ir.targets.pulumi import compile_pulumi
 from app.ir.targets.terraform import compile_terraform
 
@@ -45,6 +47,18 @@ TARGETS: dict = {
         "coverage": "partial",
         "description": "An AWS CDK app in TypeScript (aws-cdk-lib L1 constructs) — core resources.",
         "compile": compile_cdk,
+    },
+    "compose": {
+        "label": "Docker Compose",
+        "coverage": "containers",
+        "description": "Container workloads (ECS services, databases, object store) as a Compose file.",
+        "compile": compile_compose,
+    },
+    "kubernetes": {
+        "label": "Kubernetes",
+        "coverage": "containers",
+        "description": "Kubernetes manifests for the container workloads (Deployments + Services).",
+        "compile": compile_kubernetes,
     },
 }
 
