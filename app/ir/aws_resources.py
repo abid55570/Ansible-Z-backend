@@ -250,3 +250,226 @@ def rds(node, refs, ctx):
             "tags": _tags(node),
         }),
     ]
+
+
+@register("eks_cluster")
+def eks_cluster(node, refs, ctx):
+    vpc_cfg = {"subnet_ids": [Ref(s) for s in _as_list(refs["subnets"])]}
+    if "security_group" in refs:
+        vpc_cfg["security_group_ids"] = [Ref(s) for s in _as_list(refs["security_group"])]
+    return [Resource("aws_eks_cluster", node["id"], {
+        "name": node["props"].get("name", node["id"]),
+        "role_arn": node["props"].get("role_arn", "arn:aws:iam::000000000000:role/eks-cluster"),
+        "vpc_config": Block("vpc_config", vpc_cfg),
+        "tags": _tags(node),
+    })]
+
+
+@register("eks_nodegroup")
+def eks_nodegroup(node, refs, ctx):
+    p = node["props"]
+    return [Resource("aws_eks_node_group", node["id"], {
+        "cluster_name": p.get("cluster_name", "cluster"),
+        "node_group_name": p.get("name", node["id"]),
+        "node_role_arn": p.get("node_role_arn", "arn:aws:iam::000000000000:role/eks-node"),
+        "subnet_ids": [Ref(s) for s in _as_list(refs["subnets"])],
+        "scaling_config": Block("scaling_config", {
+            "desired_size": p.get("desired_size", 2),
+            "max_size": p.get("max_size", 4),
+            "min_size": p.get("min_size", 1),
+        }),
+        "tags": _tags(node),
+    })]
+
+
+@register("transit_gateway")
+def transit_gateway(node, refs, ctx):
+    return [Resource("aws_ec2_transit_gateway", node["id"], {
+        "description": node["props"].get("description", node["id"]),
+        "tags": _tags(node),
+    })]
+
+
+@register("vpn_gateway")
+def vpn_gateway(node, refs, ctx):
+    return [Resource("aws_vpn_gateway", node["id"], {"vpc_id": Ref(refs["vpc"]), "tags": _tags(node)})]
+
+
+@register("cloudtrail")
+def cloudtrail(node, refs, ctx):
+    return [Resource("aws_cloudtrail", node["id"], {
+        "name": node["props"].get("name", node["id"]),
+        "s3_bucket_name": node["props"].get("bucket_name", "audit-logs"),
+        "is_multi_region_trail": True,
+    })]
+
+
+@register("api_gateway")
+def api_gateway(node, refs, ctx):
+    return [Resource("aws_apigatewayv2_api", node["id"], {
+        "name": node["props"].get("name", node["id"]),
+        "protocol_type": "HTTP",
+        "tags": _tags(node),
+    })]
+
+
+@register("eventbridge")
+def eventbridge(node, refs, ctx):
+    return [Resource("aws_cloudwatch_event_rule", node["id"], {
+        "name": node["props"].get("name", node["id"]),
+        "schedule_expression": node["props"].get("schedule", "rate(5 minutes)"),
+        "tags": _tags(node),
+    })]
+
+
+@register("vpc_endpoint")
+def vpc_endpoint(node, refs, ctx):
+    return [Resource("aws_vpc_endpoint", node["id"], {
+        "vpc_id": Ref(refs["vpc"]),
+        "service_name": node["props"].get("service", f"com.amazonaws.{ctx['region']}.ssm"),
+        "vpc_endpoint_type": node["props"].get("endpoint_type", "Interface"),
+        "tags": _tags(node),
+    })]
+
+
+@register("ecs_cluster")
+def ecs_cluster(node, refs, ctx):
+    return [Resource("aws_ecs_cluster", node["id"], {"name": node["props"].get("name", node["id"]), "tags": _tags(node)})]
+
+
+@register("ecs_service")
+def ecs_service(node, refs, ctx):
+    p = node["props"]
+    name = node["id"]
+    task = f"{name}_task"
+    container = (
+        'jsonencode([{ name = "' + name + '-app", image = "'
+        + p.get("image", "public.ecr.aws/nginx/nginx:latest")
+        + '", essential = true, portMappings = [{ containerPort = '
+        + str(p.get("container_port", 80)) + ', protocol = "tcp" }] }])'
+    )
+    return [
+        Resource("aws_ecs_service", name, {
+            "name": f"{name}-svc",
+            "cluster": Ref(refs["cluster"], "arn"),
+            "task_definition": LocalRef("aws_ecs_task_definition", task, "arn"),
+            "desired_count": p.get("desired_count", 2),
+            "launch_type": "FARGATE",
+            "network_configuration": Block("network_configuration", {
+                "subnets": [Ref(s) for s in _as_list(refs["subnets"])],
+                "assign_public_ip": False,
+            }),
+        }),
+        Resource("aws_ecs_task_definition", task, {
+            "family": f"{name}-task",
+            "requires_compatibilities": ["FARGATE"],
+            "network_mode": "awsvpc",
+            "cpu": p.get("cpu", "512"),
+            "memory": p.get("memory", "1024"),
+            "execution_role_arn": p.get("execution_role_arn", "arn:aws:iam::000000000000:role/ecsTaskExecutionRole"),
+            "container_definitions": Raw(container),
+        }),
+    ]
+
+
+@register("cloudfront")
+def cloudfront(node, refs, ctx):
+    p = node["props"]
+    origin_id = f"origin-{node['id']}"
+    return [Resource("aws_cloudfront_distribution", node["id"], {
+        "enabled": True,
+        "default_root_object": p.get("index_document", "index.html"),
+        "origin": Block("origin", {
+            "domain_name": p.get("origin_domain", "example-bucket.s3.amazonaws.com"),
+            "origin_id": origin_id,
+        }),
+        "default_cache_behavior": Block("default_cache_behavior", {
+            "allowed_methods": ["GET", "HEAD"],
+            "cached_methods": ["GET", "HEAD"],
+            "target_origin_id": origin_id,
+            "viewer_protocol_policy": "redirect-to-https",
+            "forwarded_values": Block("forwarded_values", {
+                "query_string": False,
+                "cookies": Block("cookies", {"forward": "none"}),
+            }),
+        }),
+        "restrictions": Block("restrictions", {
+            "geo_restriction": Block("geo_restriction", {"restriction_type": "none"}),
+        }),
+        "viewer_certificate": Block("viewer_certificate", {"cloudfront_default_certificate": True}),
+        "tags": _tags(node),
+    })]
+
+
+@register("glue_crawler")
+def glue_crawler(node, refs, ctx):
+    p = node["props"]
+    return [Resource("aws_glue_crawler", node["id"], {
+        "name": p.get("name", node["id"]),
+        "database_name": p.get("database", "analytics_db"),
+        "role": p.get("role_arn", "arn:aws:iam::000000000000:role/GlueServiceRole"),
+        "s3_target": Block("s3_target", {"path": p.get("s3_path", "s3://my-bucket/")}),
+    })]
+
+
+@register("glue_job")
+def glue_job(node, refs, ctx):
+    p = node["props"]
+    return [Resource("aws_glue_job", node["id"], {
+        "name": p.get("name", node["id"]),
+        "role_arn": p.get("role_arn", "arn:aws:iam::000000000000:role/GlueServiceRole"),
+        "command": Block("command", {
+            "name": "glueetl",
+            "script_location": p.get("script_location", "s3://my-bucket/etl.py"),
+        }),
+    })]
+
+
+@register("backup_vault")
+def backup_vault(node, refs, ctx):
+    return [Resource("aws_backup_vault", node["id"], {"name": node["props"].get("name", node["id"]), "tags": _tags(node)})]
+
+
+@register("backup_plan")
+def backup_plan(node, refs, ctx):
+    p = node["props"]
+    return [Resource("aws_backup_plan", node["id"], {
+        "name": p.get("name", node["id"]),
+        "rule": Block("rule", {
+            "rule_name": "daily",
+            "target_vault_name": p.get("vault", "Default"),
+            "schedule": p.get("schedule", "cron(0 5 * * ? *)"),
+        }),
+        "tags": _tags(node),
+    })]
+
+
+@register("backup_selection")
+def backup_selection(node, refs, ctx):
+    p = node["props"]
+    return [Resource("aws_backup_selection", node["id"], {
+        "name": p.get("name", node["id"]),
+        "plan_id": p.get("plan_id", "PLAN_ID"),
+        "iam_role_arn": p.get("role_arn", "arn:aws:iam::000000000000:role/BackupServiceRole"),
+        "selection_tag": Block("selection_tag", {"type": "STRINGEQUALS", "key": "Backup", "value": "true"}),
+    })]
+
+
+@register("waf")
+def waf(node, refs, ctx):
+    return [Resource("aws_wafv2_web_acl", node["id"], {
+        "name": node["props"].get("name", node["id"]),
+        "scope": "REGIONAL",
+        "default_action": Block("default_action", {"allow": Block("allow", {})}),
+        "visibility_config": Block("visibility_config", {
+            "cloudwatch_metrics_enabled": True,
+            "metric_name": node["id"],
+            "sampled_requests_enabled": True,
+        }),
+        "tags": _tags(node),
+    })]
+
+
+@register("datacenter")
+def datacenter(node, refs, ctx):
+    return []  # on-prem marker (diagram-only) — no AWS resource

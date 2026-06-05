@@ -37,6 +37,25 @@ TF_IR = {
         {"id": "lb", "type": "alb", "props": {}, "inputs": {"subnets": ["pub", "priv"], "security_group": "sg"}},
         {"id": "tg", "type": "target_group", "props": {}, "inputs": {"vpc": "vpc"}},
         {"id": "db", "type": "rds", "props": {}, "inputs": {"subnets": ["pub", "priv"]}},
+        {"id": "eks", "type": "eks_cluster", "props": {}, "inputs": {"subnets": ["pub", "priv"], "security_group": ["sg"]}},
+        {"id": "eks2", "type": "eks_cluster", "props": {}, "inputs": {"subnets": ["pub", "priv"]}},
+        {"id": "ng", "type": "eks_nodegroup", "props": {}, "inputs": {"subnets": ["pub", "priv"]}},
+        {"id": "tgw", "type": "transit_gateway", "props": {}},
+        {"id": "vgw", "type": "vpn_gateway", "props": {}, "inputs": {"vpc": "vpc"}},
+        {"id": "trail", "type": "cloudtrail", "props": {}},
+        {"id": "api", "type": "api_gateway", "props": {}},
+        {"id": "evt", "type": "eventbridge", "props": {}},
+        {"id": "ep", "type": "vpc_endpoint", "props": {}, "inputs": {"vpc": "vpc"}},
+        {"id": "ecs", "type": "ecs_cluster", "props": {}},
+        {"id": "svc", "type": "ecs_service", "props": {}, "inputs": {"cluster": "ecs", "subnets": ["pub", "priv"]}},
+        {"id": "cf", "type": "cloudfront", "props": {}},
+        {"id": "gc", "type": "glue_crawler", "props": {}},
+        {"id": "gj", "type": "glue_job", "props": {}},
+        {"id": "bv", "type": "backup_vault", "props": {}},
+        {"id": "bp", "type": "backup_plan", "props": {}},
+        {"id": "bs", "type": "backup_selection", "props": {}},
+        {"id": "wafacl", "type": "waf", "props": {}},
+        {"id": "dc", "type": "datacenter", "props": {}},
     ],
 }
 
@@ -59,25 +78,45 @@ def test_compile_terraform_emits_provider_variables_and_resources():
     assert "health_check {" in main and "attribute {" in main
     assert "versioning_configuration {" in main
     assert 'name = "alias/key"' in main                            # kms alias
+    # the other ~18 blocks
+    assert 'resource "aws_eks_cluster" "eks"' in main
+    assert "vpc_config {" in main                                   # nested block
+    assert "security_group_ids = [aws_security_group.sg.id]" in main  # eks optional SG branch (eks has it, eks2 doesn't)
+    assert 'resource "aws_ecs_service" "svc"' in main
+    assert "cluster = aws_ecs_cluster.ecs.arn" in main              # Ref with a non-default attr
+    assert "container_definitions = jsonencode(" in main           # Raw inside a task definition
+    assert 'resource "aws_cloudfront_distribution" "cf"' in main
+    assert "forwarded_values {" in main and "geo_restriction {" in main  # nested-in-nested blocks
+    assert "default_action {" in main and "allow {" in main        # waf empty nested block
+    assert 'resource "aws_backup_plan" "bp"' in main
+    assert '"dc"' not in main                                       # datacenter is a no-op, emits nothing
     # scaffold
     assert "region = var.region" in files["provider.tf"]
     assert 'default     = "ap-south-1"' in files["variables.tf"]
     assert "sensitive   = true" in files["variables.tf"]
 
 
-def test_compile_terraform_tracks_unmapped_blocks():
+def test_compile_terraform_tracks_unmapped_blocks(monkeypatch):
+    import app.ir.canonical as canon
+
+    # Every current block is mapped, so simulate a future block whose Terraform
+    # mapping hasn't been written yet by hiding one from the registry.
+    patched = dict(canon.AWS_RESOURCES)
+    patched.pop("cloudwatch")
+    monkeypatch.setattr(canon, "AWS_RESOURCES", patched)
+
     ir = {
         "version": 1, "provider": "aws", "region": "r", "name": "n",
         "nodes": [
             {"id": "v", "type": "vpc", "props": {"cidr": "10.0.0.0/16"}},
-            {"id": "w", "type": "waf", "props": {}},
+            {"id": "cw", "type": "cloudwatch", "props": {}},
         ],
     }
     files = compile_terraform(ir)
     assert "not yet mapped" in files["main.tf"].lower()
-    assert "waf" in files["README.md"]
+    assert "cloudwatch" in files["README.md"]
     _, _, unmapped = to_resources(ir)
-    assert unmapped == ["waf"]
+    assert unmapped == ["cloudwatch"]
 
 
 def test_targets_registry_and_dispatch():

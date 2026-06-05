@@ -34,7 +34,10 @@ def _emit_block(block: Block, primary, indent: int) -> str:
     pad = " " * indent
     lines = [f"{pad}{block.name} {{"]
     for key, val in block.attrs.items():
-        lines.append(f"{pad}  {key} = {_value(val, primary, indent + 2)}")
+        if isinstance(val, Block):
+            lines.append(_emit_block(val, primary, indent + 2))
+        else:
+            lines.append(f"{pad}  {key} = {_value(val, primary, indent + 2)}")
     lines.append(f"{pad}}}")
     return "\n".join(lines)
 

@@ -90,5 +90,6 @@ def to_resources(ir: dict):
             continue
         decls = mapper(node, node.get("inputs", {}), ctx)
         resources.extend(decls)
-        primary[nid] = (decls[0].type, decls[0].name)
+        if decls:  # a no-op block (e.g. datacenter) emits nothing
+            primary[nid] = (decls[0].type, decls[0].name)
     return resources, primary, unmapped
