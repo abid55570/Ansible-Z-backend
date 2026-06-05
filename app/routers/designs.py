@@ -3,6 +3,7 @@ from fastapi import APIRouter, Body, Depends
 from app.deps import get_current_user
 from app.ir.blocks import BLOCKS
 from app.ir.compiler import IRError, validate
+from app.ir.targets import list_targets
 from app.models import User
 
 router = APIRouter(prefix="/designs", tags=["designs"])
@@ -15,6 +16,12 @@ def list_blocks() -> dict:
         name: {"inputs": spec["inputs"], "props": spec["props"], "output": spec["output"]}
         for name, spec in BLOCKS.items()
     }
+
+
+@router.get("/targets")
+def targets() -> dict:
+    """Export targets available for a design (Ansible, Terraform, …) for the picker."""
+    return {"targets": list_targets()}
 
 
 @router.post("/validate")

@@ -6,6 +6,13 @@ def test_list_blocks(client):
     assert "output" in body["vpc"]
 
 
+def test_list_targets(client):
+    response = client.get("/designs/targets")
+    assert response.status_code == 200
+    ids = [t["id"] for t in response.json()["targets"]]
+    assert "ansible" in ids and "terraform" in ids
+
+
 def test_validate_design_valid(auth_client):
     ir = {"region": "ap-south-1", "name": "n", "nodes": [{"id": "v", "type": "vpc", "props": {"cidr": "10.0.0.0/16"}}]}
     response = auth_client.post("/designs/validate", json=ir)

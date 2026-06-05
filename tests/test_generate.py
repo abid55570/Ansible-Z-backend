@@ -106,3 +106,23 @@ def test_generate_custom_design(auth_client, fake_storage):
 def test_generate_custom_design_invalid(auth_client, fake_storage):
     project_id = _make_project(auth_client, slug="__custom__", config={"region": "r", "name": "n", "nodes": []})
     assert auth_client.post(f"/projects/{project_id}/generate", json={"env": "uat"}).status_code == 400
+
+
+def test_generate_custom_terraform(auth_client, fake_storage):
+    project_id = _make_project(auth_client, slug="__custom__", config=CUSTOM_IR)
+    generated = auth_client.post(f"/projects/{project_id}/generate", json={"env": "uat", "target": "terraform"})
+    assert generated.status_code == 200, generated.text
+    assert generated.json()["lint_status"] == "skipped"  # ansible lint/syntax-check skipped for TF
+    downloaded = auth_client.get(f"/projects/{project_id}/download", params={"env": "uat"})
+    assert downloaded.status_code == 200 and downloaded.content[:2] == b"PK"
+
+
+def test_generate_template_rejects_non_ansible_target(auth_client, fake_storage):
+    project_id = _make_project(auth_client)  # a template (web-3tier)
+    response = auth_client.post(f"/projects/{project_id}/generate", json={"env": "uat", "target": "terraform"})
+    assert response.status_code == 400
+
+
+def test_generate_unknown_target(auth_client, fake_storage):
+    project_id = _make_project(auth_client, slug="__custom__", config=CUSTOM_IR)
+    assert auth_client.post(f"/projects/{project_id}/generate", json={"env": "uat", "target": "nope"}).status_code == 400

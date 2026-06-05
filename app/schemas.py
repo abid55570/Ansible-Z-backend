@@ -56,6 +56,7 @@ class ProjectOut(BaseModel):
 
 class GenerateIn(BaseModel):
     env: str = "uat"
+    target: str = "ansible"
 
 
 class GenerationOut(BaseModel):
