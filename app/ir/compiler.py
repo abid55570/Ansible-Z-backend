@@ -1,6 +1,14 @@
 import yaml
 
 from app.ir.blocks import BLOCKS
+from app.services.projectfmt import normalize_files
+
+
+class _IndentDumper(yaml.Dumper):
+    """Indent block sequences under their parent key (matches yamllint indent-sequences)."""
+
+    def increase_indent(self, flow=False, indentless=False):
+        return super().increase_indent(flow, False)
 
 
 class IRError(Exception):
@@ -47,7 +55,8 @@ def validate(ir: dict) -> None:
         inputs = node.get("inputs", {})
         for port, pspec in spec["inputs"].items():
             if port not in inputs:
-                errors.append(f"{nid}: missing input '{port}'")
+                if not pspec.get("optional"):
+                    errors.append(f"{nid}: missing input '{port}'")
                 continue
             refs = inputs[port] if isinstance(inputs[port], list) else [inputs[port]]
             for ref in refs:
@@ -170,19 +179,21 @@ def _assemble(ir: dict, tasks: list[dict]) -> dict[str, str]:
         "hosts": "localhost",
         "connection": "local",
         "gather_facts": False,
-        "collections": ["amazon.aws", "community.aws"],
         "tasks": tasks,
     }
-    site = "---\n" + yaml.dump([play], sort_keys=False, default_flow_style=False, width=120)
+    site = "---\n" + yaml.dump(
+        [play], Dumper=_IndentDumper, sort_keys=False, default_flow_style=False, width=120, indent=2
+    )
     group_vars = "---\n" + yaml.dump(
         {
             "aws_region": ir["region"],
             "default_ami": "ami-PLACEHOLDER",
             "common_tags": {"ManagedBy": "ansible", "GeneratedBy": "neviri-ansi", "Design": ir["name"]},
         },
+        Dumper=_IndentDumper,
         sort_keys=False,
     )
-    return {
+    return normalize_files({
         "site.yml": site,
         "group_vars/all.yml": group_vars,
         "ansible.cfg": ANSIBLE_CFG,
@@ -190,7 +201,7 @@ def _assemble(ir: dict, tasks: list[dict]) -> dict[str, str]:
         "preflight.yml": PREFLIGHT,
         "inventory/aws_ec2.yml": INVENTORY.format(region=ir["region"]),
         "README.md": _readme(ir),
-    }
+    })
 
 
 def _readme(ir: dict) -> str:

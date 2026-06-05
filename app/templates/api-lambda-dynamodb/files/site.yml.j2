@@ -5,9 +5,6 @@
   hosts: localhost
   connection: local
   gather_facts: false
-  collections:
-    - amazon.aws
-    - community.aws
   tasks:
     - name: DynamoDB table (on-demand)
       community.aws.dynamodb_table:
@@ -22,7 +19,9 @@
     - name: Lambda execution role
       amazon.aws.iam_role:
         name: "{{ project_name }}-api-role"
-        assume_role_policy_document: '{ "Version": "2012-10-17", "Statement": [{ "Effect": "Allow", "Principal": {"Service": "lambda.amazonaws.com"}, "Action": "sts:AssumeRole" }] }'
+        assume_role_policy_document: >-
+          { "Version": "2012-10-17", "Statement": [{ "Effect": "Allow",
+          "Principal": {"Service": "lambda.amazonaws.com"}, "Action": "sts:AssumeRole" }] }
         managed_policies:
           - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
           - "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"

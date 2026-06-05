@@ -38,7 +38,7 @@ DESIGN_IR = {
         {"id": "ddb1", "type": "dynamodb", "props": {}},
         {"id": "key1", "type": "kms_key", "props": {}},
         {"id": "role1", "type": "iam_role", "props": {}},
-        {"id": "eks1", "type": "eks_cluster", "props": {}, "inputs": {"subnets": ["pub1", "pub2"]}},
+        {"id": "eks1", "type": "eks_cluster", "props": {}, "inputs": {"subnets": ["pub1", "pub2"], "security_group": ["sg1"]}},
         {"id": "ng1", "type": "eks_nodegroup", "props": {}, "inputs": {"subnets": ["pub1", "pub2"]}},
         {"id": "tgw1", "type": "transit_gateway", "props": {}},
         {"id": "vgw1", "type": "vpn_gateway", "props": {}, "inputs": {"vpc": "vpc1"}},

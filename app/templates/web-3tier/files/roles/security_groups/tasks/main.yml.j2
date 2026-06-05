@@ -4,13 +4,13 @@
     region: "{{ aws_region }}"
     filters:
       "tag:Project": "{{ project_name }}"
-  register: vpc_info
+  register: security_groups_vpc_info
 
 - name: ALB security group (public 80/443)
   amazon.aws.ec2_security_group:
     name: "{{ project_name }}-alb-sg"
     description: "ALB public ingress"
-    vpc_id: "{{ vpc_info.vpcs[0].id }}"
+    vpc_id: "{{ security_groups_vpc_info.vpcs[0].id }}"
     region: "{{ aws_region }}"
     rules:
       - proto: tcp
@@ -23,7 +23,7 @@
   amazon.aws.ec2_security_group:
     name: "{{ project_name }}-bastion-sg"
     description: "Bastion SSH"
-    vpc_id: "{{ vpc_info.vpcs[0].id }}"
+    vpc_id: "{{ security_groups_vpc_info.vpcs[0].id }}"
     region: "{{ aws_region }}"
     rules:
       - proto: tcp

@@ -4,9 +4,6 @@
   hosts: localhost
   connection: local
   gather_facts: false
-  collections:
-    - amazon.aws
-    - community.aws
   roles:
     - vpc
     - security_groups

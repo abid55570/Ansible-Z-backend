@@ -5,9 +5,6 @@
   hosts: localhost
   connection: local
   gather_facts: false
-  collections:
-    - amazon.aws
-    - community.aws
   tasks:
     - name: Raw data bucket
       amazon.aws.s3_bucket:
@@ -28,7 +25,9 @@
     - name: Glue service role
       amazon.aws.iam_role:
         name: "{{ project_name }}-glue-role"
-        assume_role_policy_document: '{ "Version": "2012-10-17", "Statement": [{ "Effect": "Allow", "Principal": {"Service": "glue.amazonaws.com"}, "Action": "sts:AssumeRole" }] }'
+        assume_role_policy_document: >-
+          { "Version": "2012-10-17", "Statement": [{ "Effect": "Allow",
+          "Principal": {"Service": "glue.amazonaws.com"}, "Action": "sts:AssumeRole" }] }
         managed_policies:
           - "arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole"
           - "arn:aws:iam::aws:policy/AmazonS3FullAccess"

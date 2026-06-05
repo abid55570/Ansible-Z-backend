@@ -3,6 +3,8 @@ from pathlib import Path
 import yaml
 from jinja2 import Environment, StrictUndefined
 
+from app.services.projectfmt import normalize_files
+
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
 
@@ -72,7 +74,7 @@ def render_project(slug: str, variables: dict, env: str | None = None) -> dict[s
         relative = relative.replace("__env__", env or "all")
         template = jinja_env.from_string(path.read_text(encoding="utf-8"))
         rendered[relative] = template.render(**context)
-    return rendered
+    return normalize_files(rendered)
 
 
 def template_is_ready(slug: str) -> bool:

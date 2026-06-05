@@ -3,8 +3,6 @@
   hosts: localhost
   connection: local
   gather_facts: false
-  collections:
-    - amazon.aws
   tasks:
     - name: VPC
       amazon.aws.ec2_vpc_net:
@@ -57,7 +55,9 @@
     - name: Instance role for SSM (least privilege)
       amazon.aws.iam_role:
         name: "{{ project_name }}-ssm-role"
-        assume_role_policy_document: '{ "Version": "2012-10-17", "Statement": [{ "Effect": "Allow", "Principal": {"Service": "ec2.amazonaws.com"}, "Action": "sts:AssumeRole" }] }'
+        assume_role_policy_document: >-
+          { "Version": "2012-10-17", "Statement": [{ "Effect": "Allow",
+          "Principal": {"Service": "ec2.amazonaws.com"}, "Action": "sts:AssumeRole" }] }
         managed_policies:
           - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
         state: present

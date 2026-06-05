@@ -4,7 +4,7 @@
     region: "{{ aws_region }}"
     filters:
       "tag:Role": public
-  register: pub
+  register: alb_pub
 
 - name: Create target group
   community.aws.elb_target_group:
@@ -12,7 +12,7 @@
     region: "{{ aws_region }}"
     protocol: HTTP
     port: 80
-    vpc_id: "{{ pub.subnets[0].vpc_id }}"
+    vpc_id: "{{ alb_pub.subnets[0].vpc_id }}"
     target_type: instance
     health_check_path: /
     health_check_protocol: HTTP
@@ -22,7 +22,7 @@
   amazon.aws.elb_application_lb:
     name: "{{ project_name }}-alb"
     region: "{{ aws_region }}"
-    subnets: "{{ pub.subnets | map(attribute='id') | list }}"
+    subnets: "{{ alb_pub.subnets | map(attribute='id') | list }}"
     security_groups:
       - "{{ project_name }}-alb-sg"
     listeners:

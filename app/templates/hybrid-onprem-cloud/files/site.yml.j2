@@ -3,8 +3,6 @@
   hosts: localhost
   connection: local
   gather_facts: false
-  collections:
-    - amazon.aws
   tasks:
     - name: Cloud VPC
       amazon.aws.ec2_vpc_net:

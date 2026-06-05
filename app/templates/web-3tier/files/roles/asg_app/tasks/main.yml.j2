@@ -12,7 +12,7 @@
     region: "{{ aws_region }}"
     filters:
       "tag:Role": private
-  register: priv
+  register: asg_app_priv
 
 - name: Create auto scaling group
   amazon.aws.autoscaling_group:
@@ -23,7 +23,7 @@
     min_size: 2
     max_size: 4
     desired_capacity: 2
-    vpc_zone_identifier: "{{ priv.subnets | map(attribute='id') | list }}"
+    vpc_zone_identifier: "{{ asg_app_priv.subnets | map(attribute='id') | list }}"
     tags:
       - Project: "{{ project_name }}"
     state: present

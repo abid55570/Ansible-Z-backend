@@ -287,16 +287,16 @@ def _iam_role(node, refs, ctx):
 
 
 def _eks_cluster(node, refs, ctx):
-    return {
-        "name": f"EKS cluster: {node['id']}",
-        "community.aws.eks_cluster": {
-            "name": node["props"].get("name", node["id"]),
-            "region": ctx["region"],
-            "role_arn": node["props"].get("role_arn", "arn:aws:iam::000000000000:role/eks-cluster"),
-            "subnets": refs["subnets"],
-            "state": "present",
-        },
+    cluster = {
+        "name": node["props"].get("name", node["id"]),
+        "region": ctx["region"],
+        "role_arn": node["props"].get("role_arn", "arn:aws:iam::000000000000:role/eks-cluster"),
+        "subnets": refs["subnets"],
+        "state": "present",
     }
+    if "security_group" in refs:
+        cluster["security_groups"] = refs["security_group"]
+    return {"name": f"EKS cluster: {node['id']}", "community.aws.eks_cluster": cluster}
 
 
 def _eks_nodegroup(node, refs, ctx):
@@ -764,7 +764,10 @@ BLOCKS: dict[str, dict] = {
         "render": _iam_role,
     },
     "eks_cluster": {
-        "inputs": {"subnets": {"type": "subnet", "many": True}},
+        "inputs": {
+            "subnets": {"type": "subnet", "many": True},
+            "security_group": {"type": "security_group", "many": True, "optional": True},
+        },
         "props": {
             "name": {"type": "string"},
             "role_arn": {"type": "string", "guidance": "EKS cluster IAM role ARN."},
