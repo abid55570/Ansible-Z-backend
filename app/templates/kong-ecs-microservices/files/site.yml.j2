@@ -191,6 +191,7 @@
         vpc_id: "{{ vpc.vpc.id }}"
         target_type: ip
         health_check_path: /status
+        health_check_protocol: HTTP
         state: present
 
     - name: Application load balancer

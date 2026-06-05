@@ -44,9 +44,9 @@
         region: "{{ aws_region }}"
         service: "com.amazonaws.{{ aws_region }}.{{ item }}"
         vpc_endpoint_type: Interface
-        subnets:
+        vpc_endpoint_subnets:
           - "{{ subnet.subnet.id }}"
-        security_groups:
+        vpc_endpoint_security_groups:
           - "{{ ep_sg.group_id }}"
         state: present
       loop:

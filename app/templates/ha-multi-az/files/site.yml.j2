@@ -122,6 +122,7 @@
         vpc_id: "{{ vpc.vpc.id }}"
         target_type: instance
         health_check_path: /
+        health_check_protocol: HTTP
         state: present
 
     - name: Create application load balancer (multi-AZ)

@@ -68,6 +68,7 @@
         vpc_id: "{{ vpc.vpc.id }}"
         target_type: instance
         health_check_path: /
+        health_check_protocol: HTTP
         state: present
 
     - name: Green target group
@@ -79,6 +80,7 @@
         vpc_id: "{{ vpc.vpc.id }}"
         target_type: instance
         health_check_path: /
+        health_check_protocol: HTTP
         state: present
 
     - name: ALB (forwards to blue; flip to green on deploy)
