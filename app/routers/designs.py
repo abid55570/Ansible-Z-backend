@@ -5,6 +5,7 @@ from app.ir.blocks import BLOCKS
 from app.ir.compiler import IRError, validate
 from app.ir.targets import list_targets
 from app.models import User
+from app.services.cost import estimate as estimate_cost
 
 router = APIRouter(prefix="/designs", tags=["designs"])
 
@@ -32,3 +33,9 @@ def validate_design(ir: dict = Body(...), user: User = Depends(get_current_user)
     except IRError as exc:
         return {"valid": False, "errors": exc.errors}
     return {"valid": True, "errors": []}
+
+
+@router.post("/cost")
+def cost(ir: dict = Body(...), user: User = Depends(get_current_user)) -> dict:
+    """Rough monthly cost estimate for a design — powers the live cost panel."""
+    return estimate_cost(ir)

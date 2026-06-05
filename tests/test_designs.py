@@ -31,3 +31,15 @@ def test_validate_design_invalid(auth_client):
 def test_validate_design_requires_auth(client):
     response = client.post("/designs/validate", json={"region": "r", "name": "n", "nodes": []})
     assert response.status_code == 401
+
+
+def test_estimate_cost(auth_client):
+    ir = {"region": "ap-south-1", "name": "n", "nodes": [{"id": "web", "type": "ec2_instance", "props": {}}]}
+    response = auth_client.post("/designs/cost", json=ir)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["currency"] == "USD" and body["monthly_total"] > 0
+
+
+def test_estimate_cost_requires_auth(client):
+    assert client.post("/designs/cost", json={"nodes": []}).status_code == 401
