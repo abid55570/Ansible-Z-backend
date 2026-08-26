@@ -3,9 +3,6 @@
   hosts: localhost
   connection: local
   gather_facts: false
-  collections:
-    - amazon.aws
-    - community.aws
   tasks:
     - name: VPC
       amazon.aws.ec2_vpc_net:
@@ -68,6 +65,7 @@
         vpc_id: "{{ vpc.vpc.id }}"
         target_type: instance
         health_check_path: /
+        health_check_protocol: HTTP
         state: present
 
     - name: Green target group
@@ -79,6 +77,7 @@
         vpc_id: "{{ vpc.vpc.id }}"
         target_type: instance
         health_check_path: /
+        health_check_protocol: HTTP
         state: present
 
     - name: ALB (forwards to blue; flip to green on deploy)

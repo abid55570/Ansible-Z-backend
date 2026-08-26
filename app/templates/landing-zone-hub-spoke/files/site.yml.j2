@@ -3,12 +3,9 @@
   hosts: localhost
   connection: local
   gather_facts: false
-  collections:
-    - amazon.aws
-    - community.aws
   tasks:
     - name: Transit gateway (the hub)
-      community.aws.ec2_transit_gateway:
+      amazon.aws.ec2_transit_gateway:
         description: "{{ org_name }} hub"
         region: "{{ aws_region }}"
         tags: "{{ common_tags }}"

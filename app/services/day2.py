@@ -17,6 +17,8 @@ The playbooks target container workloads (the common case for "add another
 app") via ``community.docker`` and pass ``ansible-playbook --syntax-check``.
 """
 
+from app.services.projectfmt import normalize_files
+
 APPS_MANIFEST = """---
 # ============================================================================
 # Day-2 application manifest
@@ -197,9 +199,9 @@ Redeploys every app at its `rollback_tag`.
 
 def day2_files() -> dict[str, str]:
     """Return the Day-2 operations bundle merged into every generated project."""
-    return {
+    return normalize_files({
         "apps.yml": APPS_MANIFEST,
         "deploy.yml": DEPLOY_PLAYBOOK,
         "rollback.yml": ROLLBACK_PLAYBOOK,
         "DAY2.md": DAY2_DOC,
-    }
+    })

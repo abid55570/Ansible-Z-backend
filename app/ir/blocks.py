@@ -209,6 +209,7 @@ def _target_group(node, refs, ctx):
             "vpc_id": refs["vpc"],
             "target_type": "instance",
             "health_check_path": node["props"].get("health_check_path", "/"),
+            "health_check_protocol": node["props"].get("health_check_protocol", "HTTP"),
             "state": "present",
         },
     }
@@ -286,16 +287,16 @@ def _iam_role(node, refs, ctx):
 
 
 def _eks_cluster(node, refs, ctx):
-    return {
-        "name": f"EKS cluster: {node['id']}",
-        "community.aws.eks_cluster": {
-            "name": node["props"].get("name", node["id"]),
-            "region": ctx["region"],
-            "role_arn": node["props"].get("role_arn", "arn:aws:iam::000000000000:role/eks-cluster"),
-            "subnets": refs["subnets"],
-            "state": "present",
-        },
+    cluster = {
+        "name": node["props"].get("name", node["id"]),
+        "region": ctx["region"],
+        "role_arn": node["props"].get("role_arn", "arn:aws:iam::000000000000:role/eks-cluster"),
+        "subnets": refs["subnets"],
+        "state": "present",
     }
+    if "security_group" in refs:
+        cluster["security_groups"] = refs["security_group"]
+    return {"name": f"EKS cluster: {node['id']}", "community.aws.eks_cluster": cluster}
 
 
 def _eks_nodegroup(node, refs, ctx):
@@ -315,7 +316,7 @@ def _eks_nodegroup(node, refs, ctx):
 def _transit_gateway(node, refs, ctx):
     return {
         "name": f"Transit gateway: {node['id']}",
-        "community.aws.ec2_transit_gateway": {
+        "amazon.aws.ec2_transit_gateway": {
             "description": node["props"].get("description", node["id"]),
             "region": ctx["region"],
             "tags": TAGS,
@@ -484,7 +485,8 @@ def _glue_job(node, refs, ctx):
         "community.aws.glue_job": {
             "name": p.get("name", node["id"]),
             "role": p.get("role_arn", "arn:aws:iam::000000000000:role/GlueServiceRole"),
-            "command": {"name": "glueetl", "script_location": p.get("script_location", "s3://my-bucket/etl.py")},
+            "command_name": "glueetl",
+            "command_script_location": p.get("script_location", "s3://my-bucket/etl.py"),
             "state": "present",
         },
     }
@@ -549,7 +551,7 @@ def _backup_selection(node, refs, ctx):
         "name": f"Backup selection: {node['id']}",
         "amazon.aws.backup_selection": {
             "selection_name": p.get("name", node["id"]),
-            "backup_plan_id": p.get("plan_id", "PLAN_ID"),
+            "backup_plan_name": p.get("plan_name", "Default"),
             "iam_role_arn": p.get("role_arn", "arn:aws:iam::000000000000:role/BackupServiceRole"),
             "list_of_tags": [{"condition_type": "STRINGEQUALS", "condition_key": "Backup", "condition_value": "true"}],
             "region": ctx["region"],
@@ -565,13 +567,11 @@ def _waf(node, refs, ctx):
             "name": node["props"].get("name", node["id"]),
             "scope": "REGIONAL",
             "region": ctx["region"],
-            "default_action": "allow",
+            "default_action": "Allow",
             "rules": [],
-            "visibility_config": {
-                "sampled_requests_enabled": True,
-                "cloudwatch_metrics_enabled": True,
-                "metric_name": node["id"],
-            },
+            "cloudwatch_metrics": True,
+            "sampled_requests": True,
+            "metric_name": node["id"],
             "state": "present",
         },
     }
@@ -637,7 +637,7 @@ BLOCKS: dict[str, dict] = {
         },
         "props": {
             "name": {"type": "string"},
-            "instance_type": {"type": "string", "default": "t3.micro", "guidance": "EC2 instance size."},
+            "instance_type": {"type": "string", "default": "t3.micro", "guidance": "EC2 instance size / flavour.", "options": ["t2.micro", "t3.micro", "t3.small", "t3.medium", "t3.large", "m5.large", "m5.xlarge", "c5.large"]},
             "ami": {"type": "string", "guidance": "AMI id (defaults to a group_var placeholder)."},
             "public": {"type": "bool", "default": False, "guidance": "Assign a public IP?"},
         },
@@ -660,7 +660,7 @@ BLOCKS: dict[str, dict] = {
         "inputs": {"subnets": {"type": "subnet", "many": True}},
         "props": {
             "engine": {"type": "string", "default": "postgres", "guidance": "Database engine."},
-            "instance_class": {"type": "string", "default": "db.t3.micro"},
+            "instance_class": {"type": "string", "default": "db.t3.micro", "guidance": "Database instance flavour.", "options": ["db.t3.micro", "db.t3.small", "db.t3.medium", "db.t3.large", "db.m5.large"]},
             "storage": {"type": "number", "default": 20, "guidance": "Allocated storage (GB)."},
             "username": {"type": "string", "default": "appadmin"},
         },
@@ -718,7 +718,7 @@ BLOCKS: dict[str, dict] = {
         "inputs": {},
         "props": {
             "name": {"type": "string"},
-            "instance_type": {"type": "string", "default": "t3.micro"},
+            "instance_type": {"type": "string", "default": "t3.micro", "guidance": "Instance flavour for the ASG.", "options": ["t2.micro", "t3.micro", "t3.small", "t3.medium", "t3.large", "m5.large"]},
             "ami": {"type": "string", "guidance": "AMI id (e.g. a Packer golden image)."},
         },
         "output": "template.launch_template_id",
@@ -764,7 +764,10 @@ BLOCKS: dict[str, dict] = {
         "render": _iam_role,
     },
     "eks_cluster": {
-        "inputs": {"subnets": {"type": "subnet", "many": True}},
+        "inputs": {
+            "subnets": {"type": "subnet", "many": True},
+            "security_group": {"type": "security_group", "many": True, "optional": True},
+        },
         "props": {
             "name": {"type": "string"},
             "role_arn": {"type": "string", "guidance": "EKS cluster IAM role ARN."},

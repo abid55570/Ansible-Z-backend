@@ -48,6 +48,22 @@ def test_strip_none_omits_unset_optionals():
     assert "az:" not in compile_ir(ir)["site.yml"]
 
 
+def test_eks_cluster_renders_optional_security_group_when_wired():
+    ir = {
+        "region": "r",
+        "name": "n",
+        "nodes": [
+            {"id": "vpc", "type": "vpc", "props": {"cidr": "10.0.0.0/16"}},
+            {"id": "pub", "type": "subnet", "props": {"cidr": "10.0.1.0/24"}, "inputs": {"vpc": "vpc"}},
+            {"id": "sg", "type": "security_group", "props": {}, "inputs": {"vpc": "vpc"}},
+            {"id": "eks", "type": "eks_cluster", "props": {}, "inputs": {"subnets": ["pub"], "security_group": ["sg"]}},
+        ],
+    }
+    site = compile_ir(ir)["site.yml"]
+    assert "security_groups:" in site
+    assert "sg_result" in site  # the wired SG is referenced
+
+
 def test_topo_sort_detects_cycle():
     with pytest.raises(IRError):
         _topo_sort([{"id": "a", "inputs": {"x": "b"}}, {"id": "b", "inputs": {"x": "a"}}])

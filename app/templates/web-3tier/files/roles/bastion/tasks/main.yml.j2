@@ -4,7 +4,7 @@
     region: "{{ aws_region }}"
     filters:
       "tag:Role": public
-  register: public_subnets
+  register: bastion_public_subnets
 
 - name: Launch bastion host
   amazon.aws.ec2_instance:
@@ -12,11 +12,11 @@
     region: "{{ aws_region }}"
     instance_type: t3.micro
     image_id: "{{ bastion_ami | default(omit) }}"
-    vpc_subnet_id: "{{ public_subnets.subnets[0].id }}"
+    vpc_subnet_id: "{{ bastion_public_subnets.subnets[0].id }}"
     network:
       assign_public_ip: true
     security_group: "{{ project_name }}-bastion-sg"
     tags: "{{ common_tags | combine({'Role': 'bastion'}) }}"
     state: present
-  when: public_subnets.subnets | length > 0
+  when: bastion_public_subnets.subnets | length > 0
 {% endraw %}

@@ -5,9 +5,6 @@
   hosts: localhost
   connection: local
   gather_facts: false
-  collections:
-    - amazon.aws
-    - community.aws
   tasks:
     - name: Create VPC
       amazon.aws.ec2_vpc_net:
@@ -107,7 +104,7 @@
         region: "{{ aws_region }}"
         engine: mysql
         db_instance_class: "{{ db_instance_class }}"
-        allocated_storage: 20
+        allocated_storage: 50
         master_username: "{{ db_username }}"
         master_user_password: "{{ db_password }}"
         db_subnet_group_name: "{{ project_name }}-db-subnets"

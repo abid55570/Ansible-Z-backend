@@ -5,9 +5,6 @@
   hosts: localhost
   connection: local
   gather_facts: false
-  collections:
-    - amazon.aws
-    - community.aws
   tasks:
     - name: Dead-letter queue
       community.aws.sqs_queue:
@@ -38,7 +35,9 @@
     - name: Worker execution role
       amazon.aws.iam_role:
         name: "{{ project_name }}-worker-role"
-        assume_role_policy_document: '{ "Version": "2012-10-17", "Statement": [{ "Effect": "Allow", "Principal": {"Service": "lambda.amazonaws.com"}, "Action": "sts:AssumeRole" }] }'
+        assume_role_policy_document: >-
+          { "Version": "2012-10-17", "Statement": [{ "Effect": "Allow",
+          "Principal": {"Service": "lambda.amazonaws.com"}, "Action": "sts:AssumeRole" }] }
         managed_policies:
           - "arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole"
         state: present

@@ -5,9 +5,6 @@
   hosts: localhost
   connection: local
   gather_facts: false
-  collections:
-    - amazon.aws
-    - community.aws
   tasks:
     - name: Backup vault
       amazon.aws.backup_vault:
@@ -19,7 +16,9 @@
     - name: Backup service role
       amazon.aws.iam_role:
         name: "{{ project_name }}-backup-role"
-        assume_role_policy_document: '{ "Version": "2012-10-17", "Statement": [{ "Effect": "Allow", "Principal": {"Service": "backup.amazonaws.com"}, "Action": "sts:AssumeRole" }] }'
+        assume_role_policy_document: >-
+          { "Version": "2012-10-17", "Statement": [{ "Effect": "Allow",
+          "Principal": {"Service": "backup.amazonaws.com"}, "Action": "sts:AssumeRole" }] }
         managed_policies:
           - "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup"
         state: present
@@ -44,7 +43,7 @@
     - name: Backup selection (resources tagged Backup=true)
       amazon.aws.backup_selection:
         selection_name: "{{ project_name }}-selection"
-        backup_plan_id: "{{ plan.backup_plan_id }}"
+        backup_plan_name: "{{ project_name }}-plan"
         iam_role_arn: "{{ backup_role.arn }}"
         list_of_tags:
           - condition_type: STRINGEQUALS

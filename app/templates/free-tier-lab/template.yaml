@@ -1,0 +1,80 @@
+id: free-tier-lab
+name: "Free-Tier Lab (deployable)"
+version: 0.1.0
+pci: none
+tier: starter
+summary: "Free-tier-only sandbox — a t3.micro web server + an S3 bucket in a public VPC. Deploy it on a fresh AWS account at ~no cost to verify your exports run end-to-end."
+
+roles: [vpc, security_group, ec2_instance, s3_bucket]
+
+variables:
+  project_name:
+    type: string
+    required: true
+    example: "free-lab"
+    guidance:
+      what: "Short slug used to name and tag every resource."
+      how_to_get: "Pick a lowercase name, e.g. 'free-lab'."
+
+  aws_region:
+    type: string
+    required: true
+    example: "ap-south-1"
+    guidance:
+      what: "AWS region to deploy into."
+      how_to_get: "Mumbai = ap-south-1, N. Virginia = us-east-1."
+
+  vpc_cidr:
+    type: cidr
+    required: true
+    default: "10.40.0.0/16"
+    guidance:
+      what: "Network range for the VPC."
+      how_to_get: "Any /16 that does not overlap your other networks."
+
+  instance_type:
+    type: string
+    required: true
+    default: "t3.micro"
+    guidance:
+      what: "EC2 flavour. t3.micro (or t2.micro) is AWS free-tier eligible (750 hrs/month)."
+      how_to_get: "Keep t3.micro to stay within the free tier."
+
+  bucket_name:
+    type: string
+    required: true
+    example: "my-free-lab-bucket-1234"
+    guidance:
+      what: "Globally-unique S3 bucket name (free tier: 5 GB)."
+      how_to_get: "Append a random suffix to make it unique, e.g. my-free-lab-1234."
+
+  office_ip:
+    type: cidr
+    required: false
+    scope: [uat, prod]
+    example: "203.0.113.10/32"
+    guidance:
+      what: "Optional. If set, SSH (port 22) is opened only to this IP. Leave blank to skip SSH entirely — the web server is reachable over HTTP regardless, so you can still verify the deploy."
+      how_to_get: "Only needed if you want to SSH in. Run: curl https://checkip.amazonaws.com then append /32"
+
+key_points:
+  - "Every resource is AWS free-tier eligible — one t3.micro instance (750 hrs/mo) and a 5 GB S3 bucket."
+  - "The AMI auto-resolves to the latest Amazon Linux 2, so the same project deploys in any region."
+  - "Only project name, region and a bucket name are required — office_ip is optional (SSH lock-down)."
+  - "HTTP (port 80) is open, so you can verify the deploy in a browser without ever needing SSH."
+  - "Deploy on a fresh account to confirm your exported Ansible or Terraform runs cleanly end-to-end."
+
+diagram:
+  nodes:
+    - { id: vpc, type: vpc, label: "VPC" }
+    - { id: subnet, type: subnet, label: "Public subnet" }
+    - { id: igw, type: igw, label: "Internet gateway" }
+    - { id: sg, type: security_group, label: "Web SG (HTTP open · SSH optional)" }
+    - { id: web, type: ec2_instance, label: "t3.micro web (free)" }
+    - { id: bucket, type: s3_bucket, label: "S3 bucket (free)" }
+  edges:
+    - { from: vpc, to: subnet, port: vpc }
+    - { from: vpc, to: igw, port: vpc }
+    - { from: vpc, to: sg, port: vpc }
+    - { from: subnet, to: web, port: subnet }
+    - { from: sg, to: web, port: security_group }

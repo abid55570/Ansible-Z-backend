@@ -34,10 +34,10 @@ variables:
   instance_type:
     type: string
     required: true
-    default: "t3.small"
+    default: "t3.medium"
     guidance:
       what: "EC2 size for the web server."
-      how_to_get: "t3.small is fine for a small blog."
+      how_to_get: "t3.medium (2 vCPU / 4 GiB) suits a typical WordPress site. Drop to t3.small for a tiny blog, or go t3.large for heavier traffic."
 
   ami_id:
     type: string

@@ -5,9 +5,6 @@
   hosts: localhost
   connection: local
   gather_facts: false
-  collections:
-    - amazon.aws
-    - community.aws
   tasks:
     - name: Create VPC
       amazon.aws.ec2_vpc_net:
@@ -176,7 +173,9 @@
     - name: ECS task execution role
       amazon.aws.iam_role:
         name: "{{ project_name }}-ecs-exec"
-        assume_role_policy_document: '{ "Version": "2012-10-17", "Statement": [{ "Effect": "Allow", "Principal": {"Service": "ecs-tasks.amazonaws.com"}, "Action": "sts:AssumeRole" }] }'
+        assume_role_policy_document: >-
+          { "Version": "2012-10-17", "Statement": [{ "Effect": "Allow",
+          "Principal": {"Service": "ecs-tasks.amazonaws.com"}, "Action": "sts:AssumeRole" }] }
         managed_policies:
           - "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
         state: present
@@ -191,6 +190,7 @@
         vpc_id: "{{ vpc.vpc.id }}"
         target_type: ip
         health_check_path: /status
+        health_check_protocol: HTTP
         state: present
 
     - name: Application load balancer

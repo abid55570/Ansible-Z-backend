@@ -5,9 +5,6 @@
   hosts: localhost
   connection: local
   gather_facts: false
-  collections:
-    - amazon.aws
-    - community.aws
   tasks:
     - name: Create VPC
       amazon.aws.ec2_vpc_net:
@@ -143,6 +140,7 @@
         vpc_id: "{{ vpc.vpc.id }}"
         target_type: instance
         health_check_path: /
+        health_check_protocol: HTTP
         state: present
 
     - name: Create application load balancer

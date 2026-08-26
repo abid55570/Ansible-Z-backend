@@ -7,8 +7,9 @@ from app.config import get_settings
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import Generation, Project, User
-from app.schemas import GenerateIn, GenerationOut, ProjectCreate, ProjectOut
-from app.ir.compiler import IRError, compile_ir
+from app.schemas import GenerateIn, GenerationOut, ProjectCreate, ProjectOut, ProjectUpdate
+from app.ir.compiler import IRError
+from app.ir.targets import TargetError, compile_target
 from app.services import ansible_check, day2, linter, packager, storage
 from app.services.generator import TemplateError, load_manifest, render_project, template_is_ready
 
@@ -55,6 +56,22 @@ def get_project(
     return _get_owned_project(project_id, user, db)
 
 
+@router.put("/{project_id}", response_model=ProjectOut)
+def update_project(
+    project_id: int,
+    body: ProjectUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Project:
+    """Update a saved design in place (name + IR config) — powers the canvas Save button."""
+    project = _get_owned_project(project_id, user, db)
+    project.name = body.name
+    project.config = body.config
+    db.commit()
+    db.refresh(project)
+    return project
+
+
 @router.post("/{project_id}/generate", response_model=GenerationOut)
 def generate(
     project_id: int,
@@ -63,13 +80,21 @@ def generate(
     db: Session = Depends(get_db),
 ) -> Generation:
     project = _get_owned_project(project_id, user, db)
+    target = body.target
 
     if project.template_slug == "__custom__":
         try:
-            files = compile_ir(project.config)
+            files = compile_target(project.config, target)
+        except TargetError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         except IRError as exc:
             raise HTTPException(status_code=400, detail={"message": "Invalid design", "errors": exc.errors}) from exc
     else:
+        if target != "ansible":
+            raise HTTPException(
+                status_code=400,
+                detail="Templates export to Ansible only — fork to the canvas to export other targets",
+            )
         if not template_is_ready(project.template_slug):
             raise HTTPException(status_code=409, detail="Template is not ready for generation yet")
         try:
@@ -77,22 +102,23 @@ def generate(
         except TemplateError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # Merge the Day-2 ops layer (deploy/update/rollback apps); a template that
-    # ships its own deploy.yml keeps it.
-    files = {**day2.day2_files(), **files}
-
-    report = linter.lint_files(files)
-    if report["status"] == "failed":
-        raise HTTPException(status_code=422, detail={"message": "Generated project failed lint", "report": report})
-
-    if get_settings().deep_lint:
-        for playbook in ("site.yml", "deploy.yml", "rollback.yml"):
-            deep = ansible_check.syntax_check(files, playbook=playbook)
-            if deep["status"] == "failed":
-                raise HTTPException(
-                    status_code=422,
-                    detail={"message": f"ansible --syntax-check failed: {playbook}", "report": deep},
-                )
+    if target == "ansible":
+        # Merge the Day-2 ops layer (deploy/update/rollback apps); a template that
+        # ships its own deploy.yml keeps it. Lint + syntax-check are Ansible-specific.
+        files = {**day2.day2_files(), **files}
+        report = linter.lint_files(files)
+        if report["status"] == "failed":
+            raise HTTPException(status_code=422, detail={"message": "Generated project failed lint", "report": report})
+        if get_settings().deep_lint:
+            for playbook in ("site.yml", "deploy.yml", "rollback.yml"):
+                deep = ansible_check.syntax_check(files, playbook=playbook)
+                if deep["status"] == "failed":
+                    raise HTTPException(
+                        status_code=422,
+                        detail={"message": f"ansible --syntax-check failed: {playbook}", "report": deep},
+                    )
+    else:
+        report = {"status": "skipped", "errors": []}
 
     blob = packager.zip_files(files)
     key = f"generations/{project.id}/{body.env}-{uuid.uuid4().hex[:8]}.zip"
@@ -136,3 +162,17 @@ def download(
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.delete("/{project_id}", status_code=204)
+def delete_project(
+    project_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Delete a project and its generations."""
+    project = _get_owned_project(project_id, user, db)
+    db.query(Generation).filter(Generation.project_id == project.id).delete()
+    db.delete(project)
+    db.commit()
+    return Response(status_code=204)

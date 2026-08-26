@@ -4,14 +4,14 @@
     region: "{{ aws_region }}"
     filters:
       "tag:Role": private
-  register: priv
+  register: rds_priv
 
 - name: Create DB subnet group
   amazon.aws.rds_subnet_group:
     name: "{{ project_name }}-db-subnets"
     region: "{{ aws_region }}"
     description: "DB subnets for {{ project_name }}"
-    subnets: "{{ priv.subnets | map(attribute='id') | list }}"
+    subnets: "{{ rds_priv.subnets | map(attribute='id') | list }}"
     state: present
 
 - name: Create RDS instance (private)

@@ -6,9 +6,6 @@
   hosts: localhost
   connection: local
   gather_facts: false
-  collections:
-    - amazon.aws
-    - community.aws
   tasks:
     - name: Create VPC
       amazon.aws.ec2_vpc_net:

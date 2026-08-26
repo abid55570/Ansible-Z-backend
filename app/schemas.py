@@ -39,6 +39,11 @@ class ProjectCreate(BaseModel):
     config: dict = {}
 
 
+class ProjectUpdate(BaseModel):
+    name: str
+    config: dict = {}
+
+
 class ProjectOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -51,6 +56,7 @@ class ProjectOut(BaseModel):
 
 class GenerateIn(BaseModel):
     env: str = "uat"
+    target: str = "ansible"
 
 
 class GenerationOut(BaseModel):
