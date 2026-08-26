@@ -9,7 +9,7 @@ subnet_b_cidr: "{{ vpc_cidr.split('.')[0] }}.{{ vpc_cidr.split('.')[1] }}.2.0/24
 az_a: "{{ aws_region }}a"
 az_b: "{{ aws_region }}b"
 instance_type: "{{ instance_type }}"
-db_instance_class: "{{ db_instance_class | default('db.t3.micro') }}"
+db_instance_class: "{{ db_instance_class | default('db.t3.small') }}"
 ami_id: "{{ ami_id | default('ami-PLACEHOLDER') }}"
 key_name: "{{ key_name | default('') }}"
 db_username: "{{ db_username }}"
